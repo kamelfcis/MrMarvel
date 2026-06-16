@@ -77,18 +77,8 @@ interface SavedInventoriesModalProps {
   onOpenChange: (open: boolean) => void
   inventories: InventoryCount[]
   loading: boolean
-  currentUserId: string | undefined
-  isSuperAdmin: boolean
   onView: (id: number) => void
   onDelete: (id: number) => void
-}
-
-function canDeleteInventory(
-  inv: InventoryCount,
-  currentUserId: string | undefined,
-  isSuperAdmin: boolean
-): boolean {
-  return isSuperAdmin || (!!currentUserId && inv.created_by_id === currentUserId)
 }
 
 function LoadingState() {
@@ -333,13 +323,11 @@ function InventoryActions({
   inv,
   onView,
   onDeleteRequest,
-  canDelete,
   compact = false,
 }: {
   inv: InventoryCount
   onView: (id: number) => void
   onDeleteRequest: (id: number) => void
-  canDelete: boolean
   compact?: boolean
 }) {
   return (
@@ -356,36 +344,29 @@ function InventoryActions({
         <Eye className="h-4 w-4" />
         عرض
       </Button>
-      {canDelete && (
-        <Button
-          size={compact ? 'default' : 'sm'}
-          variant="destructive"
-          onClick={() => onDeleteRequest(inv.id)}
-          className={cn('gap-1.5', compact && 'min-h-11 flex-1')}
-        >
-          <Trash2 className="h-4 w-4" />
-          حذف
-        </Button>
-      )}
+      <Button
+        size={compact ? 'default' : 'sm'}
+        variant="destructive"
+        onClick={() => onDeleteRequest(inv.id)}
+        className={cn('gap-1.5', compact && 'min-h-11 flex-1')}
+      >
+        <Trash2 className="h-4 w-4" />
+        حذف
+      </Button>
     </div>
   )
 }
 
 function MobileInventoryCard({
   inv,
-  currentUserId,
-  isSuperAdmin,
   onView,
   onDeleteRequest,
 }: {
   inv: InventoryCount
-  currentUserId: string | undefined
-  isSuperAdmin: boolean
   onView: (id: number) => void
   onDeleteRequest: (id: number) => void
 }) {
   const creatorName = inv.profiles?.full_name || inv.created_by || 'غير معروف'
-  const canDelete = canDeleteInventory(inv, currentUserId, isSuperAdmin)
 
   return (
     <article className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md">
@@ -433,7 +414,6 @@ function MobileInventoryCard({
           inv={inv}
           onView={onView}
           onDeleteRequest={onDeleteRequest}
-          canDelete={canDelete}
           compact
         />
       </div>
@@ -444,20 +424,15 @@ function MobileInventoryCard({
 function TabletInventoryRow({
   inv,
   index,
-  currentUserId,
-  isSuperAdmin,
   onView,
   onDeleteRequest,
 }: {
   inv: InventoryCount
   index: number
-  currentUserId: string | undefined
-  isSuperAdmin: boolean
   onView: (id: number) => void
   onDeleteRequest: (id: number) => void
 }) {
   const creatorName = inv.profiles?.full_name || inv.created_by || '—'
-  const canDelete = canDeleteInventory(inv, currentUserId, isSuperAdmin)
 
   return (
     <tr
@@ -490,7 +465,6 @@ function TabletInventoryRow({
           inv={inv}
           onView={onView}
           onDeleteRequest={onDeleteRequest}
-          canDelete={canDelete}
         />
       </td>
     </tr>
@@ -500,20 +474,15 @@ function TabletInventoryRow({
 function DesktopInventoryRow({
   inv,
   index,
-  currentUserId,
-  isSuperAdmin,
   onView,
   onDeleteRequest,
 }: {
   inv: InventoryCount
   index: number
-  currentUserId: string | undefined
-  isSuperAdmin: boolean
   onView: (id: number) => void
   onDeleteRequest: (id: number) => void
 }) {
   const creatorName = inv.profiles?.full_name || inv.created_by || '—'
-  const canDelete = canDeleteInventory(inv, currentUserId, isSuperAdmin)
 
   return (
     <tr
@@ -555,7 +524,6 @@ function DesktopInventoryRow({
           inv={inv}
           onView={onView}
           onDeleteRequest={onDeleteRequest}
-          canDelete={canDelete}
         />
       </td>
     </tr>
@@ -567,8 +535,6 @@ export function SavedInventoriesModal({
   onOpenChange,
   inventories,
   loading,
-  currentUserId,
-  isSuperAdmin,
   onView,
   onDelete,
 }: SavedInventoriesModalProps) {
@@ -809,8 +775,6 @@ export function SavedInventoriesModal({
                     <MobileInventoryCard
                       key={inv.id}
                       inv={inv}
-                      currentUserId={currentUserId}
-                      isSuperAdmin={isSuperAdmin}
                       onView={onView}
                       onDeleteRequest={setDeleteConfirmId}
                     />
@@ -837,8 +801,6 @@ export function SavedInventoriesModal({
                           key={inv.id}
                           inv={inv}
                           index={index}
-                          currentUserId={currentUserId}
-                          isSuperAdmin={isSuperAdmin}
                           onView={onView}
                           onDeleteRequest={setDeleteConfirmId}
                         />
@@ -867,8 +829,6 @@ export function SavedInventoriesModal({
                           key={inv.id}
                           inv={inv}
                           index={index}
-                          currentUserId={currentUserId}
-                          isSuperAdmin={isSuperAdmin}
                           onView={onView}
                           onDeleteRequest={setDeleteConfirmId}
                         />

@@ -686,8 +686,6 @@ export default function InventoryDashboard() {
         onOpenChange={setSavedOpen}
         inventories={savedInventories}
         loading={loadingSaved}
-        currentUserId={user?.id}
-        isSuperAdmin={isSuperAdmin}
         onView={viewInventory}
         onDelete={deleteInventory}
       />
