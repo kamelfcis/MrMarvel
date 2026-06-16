@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Archive,
   Calendar,
+  ChevronDown,
   Eye,
   Filter,
   Loader2,
@@ -27,6 +28,11 @@ import {
 import { formatDate, getAccuracyColorClass } from '../../lib/utils'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '../ui/collapsible'
 import {
   Dialog,
   DialogContent,
@@ -612,7 +618,7 @@ export function SavedInventoriesModal({
           className={cn(
             'flex max-h-[100dvh] max-w-none flex-col gap-0 overflow-hidden p-0',
             'fixed inset-0 h-[100dvh] w-full translate-x-0 translate-y-0 rounded-none border-0',
-            'sm:inset-auto sm:left-[50%] sm:top-[50%] sm:h-auto sm:max-h-[92vh] sm:max-w-5xl sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl sm:border sm:border-gray-200 sm:shadow-2xl'
+            'sm:inset-auto sm:left-[50%] sm:top-[50%] sm:h-auto sm:max-h-[92vh] sm:w-[95vw] sm:max-w-7xl sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl sm:border sm:border-gray-200 sm:shadow-2xl'
           )}
         >
           <DialogHeader className="shrink-0 border-b border-gray-100 bg-gradient-to-l from-blue-50/80 to-white px-4 py-5 sm:px-6">
@@ -712,23 +718,55 @@ export function SavedInventoriesModal({
               }}
             />
 
-            <div className="hidden lg:block">
-              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gradient-to-b from-white to-slate-50/80 p-4 shadow-sm">
-                <p className="mb-3 flex items-center gap-2 text-sm font-medium text-gray-800">
-                  <SlidersHorizontal className="h-4 w-4 text-blue-600" />
-                  لوحة التصفية المتقدمة
-                </p>
-                <FilterFields
-                  filters={{ ...filters, searchTerm: searchInput }}
-                  onFiltersChange={(next) => {
-                    setSearchInput(next.searchTerm)
-                    setFilters(next)
-                  }}
-                  creators={creators}
-                  showCreatorFilter={isSuperAdmin}
-                />
+            <Collapsible className="group hidden lg:block">
+              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gradient-to-b from-white to-slate-50/80 shadow-sm">
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between px-5 py-4 text-right transition hover:bg-blue-50/40"
+                  >
+                    <span className="flex items-center gap-2 text-sm font-medium text-gray-800">
+                      <SlidersHorizontal className="h-4 w-4 text-blue-600" />
+                      لوحة التصفية المتقدمة
+                      {activeFilterCount > 0 && (
+                        <Badge variant="info">
+                          {activeFilterCount.toLocaleString('ar-EG')}
+                        </Badge>
+                      )}
+                    </span>
+                    <ChevronDown className="h-4 w-4 text-gray-500 transition-transform group-data-[state=open]:rotate-180" />
+                  </button>
+                </CollapsibleTrigger>
+
+                <CollapsibleContent>
+                  <div className="space-y-4 border-t border-gray-100 px-5 py-5">
+                    <FilterFields
+                      filters={{ ...filters, searchTerm: searchInput }}
+                      onFiltersChange={(next) => {
+                        setSearchInput(next.searchTerm)
+                        setFilters(next)
+                      }}
+                      creators={creators}
+                      showCreatorFilter={isSuperAdmin}
+                    />
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setFilters(DEFAULT_SAVED_INVENTORY_FILTERS)
+                          setSearchInput('')
+                        }}
+                        disabled={activeFilterCount === 0}
+                      >
+                        مسح جميع التصفيات
+                      </Button>
+                    </div>
+                  </div>
+                </CollapsibleContent>
               </div>
-            </div>
+            </Collapsible>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto">
