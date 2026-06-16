@@ -77,9 +77,18 @@ interface SavedInventoriesModalProps {
   onOpenChange: (open: boolean) => void
   inventories: InventoryCount[]
   loading: boolean
+  currentUserId: string | undefined
   isSuperAdmin: boolean
   onView: (id: number) => void
   onDelete: (id: number) => void
+}
+
+function canDeleteInventory(
+  inv: InventoryCount,
+  currentUserId: string | undefined,
+  isSuperAdmin: boolean
+): boolean {
+  return isSuperAdmin || (!!currentUserId && inv.created_by_id === currentUserId)
 }
 
 function LoadingState() {
@@ -324,11 +333,13 @@ function InventoryActions({
   inv,
   onView,
   onDeleteRequest,
+  canDelete,
   compact = false,
 }: {
   inv: InventoryCount
   onView: (id: number) => void
   onDeleteRequest: (id: number) => void
+  canDelete: boolean
   compact?: boolean
 }) {
   return (
@@ -345,31 +356,36 @@ function InventoryActions({
         <Eye className="h-4 w-4" />
         عرض
       </Button>
-      <Button
-        size={compact ? 'default' : 'sm'}
-        variant="destructive"
-        onClick={() => onDeleteRequest(inv.id)}
-        className={cn('gap-1.5', compact && 'min-h-11 flex-1')}
-      >
-        <Trash2 className="h-4 w-4" />
-        حذف
-      </Button>
+      {canDelete && (
+        <Button
+          size={compact ? 'default' : 'sm'}
+          variant="destructive"
+          onClick={() => onDeleteRequest(inv.id)}
+          className={cn('gap-1.5', compact && 'min-h-11 flex-1')}
+        >
+          <Trash2 className="h-4 w-4" />
+          حذف
+        </Button>
+      )}
     </div>
   )
 }
 
 function MobileInventoryCard({
   inv,
+  currentUserId,
   isSuperAdmin,
   onView,
   onDeleteRequest,
 }: {
   inv: InventoryCount
+  currentUserId: string | undefined
   isSuperAdmin: boolean
   onView: (id: number) => void
   onDeleteRequest: (id: number) => void
 }) {
   const creatorName = inv.profiles?.full_name || inv.created_by || 'غير معروف'
+  const canDelete = canDeleteInventory(inv, currentUserId, isSuperAdmin)
 
   return (
     <article className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md">
@@ -404,13 +420,11 @@ function MobileInventoryCard({
         </div>
       </div>
 
-      {isSuperAdmin && (
-        <div className="mb-3 flex items-center gap-1.5 rounded-xl border border-dashed border-gray-200 px-3 py-2 text-sm text-blue-700">
-          <User className="h-3.5 w-3.5 shrink-0" />
-          <span className="text-gray-500">أنشأ بواسطة:</span>
-          <span className="truncate font-medium">{creatorName}</span>
-        </div>
-      )}
+      <div className="mb-3 flex items-center gap-1.5 rounded-xl border border-dashed border-gray-200 px-3 py-2 text-sm text-blue-700">
+        <User className="h-3.5 w-3.5 shrink-0" />
+        <span className="text-gray-500">أنشأ بواسطة:</span>
+        <span className="truncate font-medium">{creatorName}</span>
+      </div>
 
       <StatsSummary inv={inv} />
 
@@ -419,6 +433,7 @@ function MobileInventoryCard({
           inv={inv}
           onView={onView}
           onDeleteRequest={onDeleteRequest}
+          canDelete={canDelete}
           compact
         />
       </div>
@@ -429,17 +444,20 @@ function MobileInventoryCard({
 function TabletInventoryRow({
   inv,
   index,
+  currentUserId,
   isSuperAdmin,
   onView,
   onDeleteRequest,
 }: {
   inv: InventoryCount
   index: number
+  currentUserId: string | undefined
   isSuperAdmin: boolean
   onView: (id: number) => void
   onDeleteRequest: (id: number) => void
 }) {
   const creatorName = inv.profiles?.full_name || inv.created_by || '—'
+  const canDelete = canDeleteInventory(inv, currentUserId, isSuperAdmin)
 
   return (
     <tr
@@ -466,11 +484,14 @@ function TabletInventoryRow({
       >
         {inv.accuracy_rate}%
       </td>
-      {isSuperAdmin && (
-        <td className="max-w-[8rem] truncate px-4 py-3 text-sm text-blue-700">{creatorName}</td>
-      )}
+      <td className="max-w-[8rem] truncate px-4 py-3 text-sm text-blue-700">{creatorName}</td>
       <td className="whitespace-nowrap px-4 py-3">
-        <InventoryActions inv={inv} onView={onView} onDeleteRequest={onDeleteRequest} />
+        <InventoryActions
+          inv={inv}
+          onView={onView}
+          onDeleteRequest={onDeleteRequest}
+          canDelete={canDelete}
+        />
       </td>
     </tr>
   )
@@ -479,17 +500,20 @@ function TabletInventoryRow({
 function DesktopInventoryRow({
   inv,
   index,
+  currentUserId,
   isSuperAdmin,
   onView,
   onDeleteRequest,
 }: {
   inv: InventoryCount
   index: number
+  currentUserId: string | undefined
   isSuperAdmin: boolean
   onView: (id: number) => void
   onDeleteRequest: (id: number) => void
 }) {
   const creatorName = inv.profiles?.full_name || inv.created_by || '—'
+  const canDelete = canDeleteInventory(inv, currentUserId, isSuperAdmin)
 
   return (
     <tr
@@ -525,11 +549,14 @@ function DesktopInventoryRow({
       >
         {inv.accuracy_rate}%
       </td>
-      {isSuperAdmin && (
-        <td className="whitespace-nowrap px-5 py-3.5 text-sm text-blue-700">{creatorName}</td>
-      )}
+      <td className="whitespace-nowrap px-5 py-3.5 text-sm text-blue-700">{creatorName}</td>
       <td className="whitespace-nowrap px-5 py-3.5">
-        <InventoryActions inv={inv} onView={onView} onDeleteRequest={onDeleteRequest} />
+        <InventoryActions
+          inv={inv}
+          onView={onView}
+          onDeleteRequest={onDeleteRequest}
+          canDelete={canDelete}
+        />
       </td>
     </tr>
   )
@@ -540,6 +567,7 @@ export function SavedInventoriesModal({
   onOpenChange,
   inventories,
   loading,
+  currentUserId,
   isSuperAdmin,
   onView,
   onDelete,
@@ -594,7 +622,7 @@ export function SavedInventoriesModal({
     'الفرع',
     'الأصناف',
     'الدقة',
-    ...(isSuperAdmin ? ['أنشأ بواسطة'] : []),
+    'أنشأ بواسطة',
     'الإجراءات',
   ]
 
@@ -607,7 +635,7 @@ export function SavedInventoriesModal({
     'متطابق',
     'غير متطابق',
     'الدقة',
-    ...(isSuperAdmin ? ['أنشأ بواسطة'] : []),
+    'أنشأ بواسطة',
     'الإجراءات',
   ]
 
@@ -675,7 +703,7 @@ export function SavedInventoriesModal({
                           setFilters(next)
                         }}
                         creators={creators}
-                        showCreatorFilter={isSuperAdmin}
+                        showCreatorFilter
                         compact
                       />
                     </div>
@@ -747,7 +775,7 @@ export function SavedInventoriesModal({
                         setFilters(next)
                       }}
                       creators={creators}
-                      showCreatorFilter={isSuperAdmin}
+                      showCreatorFilter
                     />
                     <div className="flex justify-end">
                       <Button
@@ -781,6 +809,7 @@ export function SavedInventoriesModal({
                     <MobileInventoryCard
                       key={inv.id}
                       inv={inv}
+                      currentUserId={currentUserId}
                       isSuperAdmin={isSuperAdmin}
                       onView={onView}
                       onDeleteRequest={setDeleteConfirmId}
@@ -808,6 +837,7 @@ export function SavedInventoriesModal({
                           key={inv.id}
                           inv={inv}
                           index={index}
+                          currentUserId={currentUserId}
                           isSuperAdmin={isSuperAdmin}
                           onView={onView}
                           onDeleteRequest={setDeleteConfirmId}
@@ -837,6 +867,7 @@ export function SavedInventoriesModal({
                           key={inv.id}
                           inv={inv}
                           index={index}
+                          currentUserId={currentUserId}
                           isSuperAdmin={isSuperAdmin}
                           onView={onView}
                           onDeleteRequest={setDeleteConfirmId}

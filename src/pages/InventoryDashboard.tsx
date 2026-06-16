@@ -536,11 +536,9 @@ export default function InventoryDashboard() {
         <Card>
           <CardHeader>
             <CardTitle className="text-center text-2xl">نظام جرد MR Marvel</CardTitle>
-            {isSuperAdmin && (
-              <p className="text-center text-sm text-gray-500">
-                عرض جميع الجرد من جميع الموظفين
-              </p>
-            )}
+            <p className="text-center text-sm text-gray-500">
+              عرض جميع الجرد المحفوظة من جميع الموظفين
+            </p>
           </CardHeader>
           <CardContent className="space-y-8">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -688,6 +686,7 @@ export default function InventoryDashboard() {
         onOpenChange={setSavedOpen}
         inventories={savedInventories}
         loading={loadingSaved}
+        currentUserId={user?.id}
         isSuperAdmin={isSuperAdmin}
         onView={viewInventory}
         onDelete={deleteInventory}
