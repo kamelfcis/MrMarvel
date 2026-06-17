@@ -1,5 +1,84 @@
 import * as XLSX from 'xlsx'
 
+/** Arabic month names (January–December) for headers and WhatsApp messages. */
+export const ARABIC_MONTHS = [
+  'يناير',
+  'فبراير',
+  'مارس',
+  'أبريل',
+  'مايو',
+  'يونيو',
+  'يوليو',
+  'أغسطس',
+  'سبتمبر',
+  'أكتوبر',
+  'نوفمبر',
+  'ديسمبر',
+] as const
+
+export interface SalaryPeriod {
+  month: number
+  year: number
+}
+
+export function getCurrentSalaryPeriod(): SalaryPeriod {
+  const now = new Date()
+  return { month: now.getMonth() + 1, year: now.getFullYear() }
+}
+
+export function formatSalaryPeriod(period: SalaryPeriod): string {
+  const monthName = ARABIC_MONTHS[period.month - 1] ?? String(period.month)
+  return `شهر ${monthName} ${period.year}`
+}
+
+export function formatSalaryPeriodSubtitle(period: SalaryPeriod): string {
+  return `${formatSalaryPeriod(period)} - تقرير شامل للمرتبات والأهداف`
+}
+
+/** Parse month/year from free text (header row, sheet title, etc.). */
+export function parsePeriodFromText(text: string): SalaryPeriod | null {
+  const normalized = String(text).trim()
+  if (!normalized) return null
+
+  for (let i = 0; i < ARABIC_MONTHS.length; i++) {
+    const monthName = ARABIC_MONTHS[i]
+    const pattern = new RegExp(`${monthName}\\s*(\\d{4})`, 'i')
+    const match = normalized.match(pattern)
+    if (match) {
+      return { month: i + 1, year: Number(match[1]) }
+    }
+  }
+
+  const numericMatch = normalized.match(/(\d{1,2})[\/\-](\d{4})|(\d{4})[\/\-](\d{1,2})/)
+  if (numericMatch) {
+    const month = Number(numericMatch[1] ?? numericMatch[4])
+    const year = Number(numericMatch[2] ?? numericMatch[3])
+    if (month >= 1 && month <= 12 && year >= 2000 && year <= 2100) {
+      return { month, year }
+    }
+  }
+
+  return null
+}
+
+function parsePeriodFromWorkbook(
+  workbook: XLSX.WorkBook,
+  salaryData: unknown[][]
+): SalaryPeriod | null {
+  const headerCell = salaryData[0]?.[0]
+  if (headerCell) {
+    const fromHeader = parsePeriodFromText(String(headerCell))
+    if (fromHeader) return fromHeader
+  }
+
+  for (const sheetName of workbook.SheetNames) {
+    const fromSheet = parsePeriodFromText(sheetName)
+    if (fromSheet) return fromSheet
+  }
+
+  return null
+}
+
 export interface EmployeeSalary {
   name: string
   branch: string
@@ -89,6 +168,7 @@ export async function parseSalaryWorkbook(file: File) {
   return {
     employees: processSalaryData(salaryData),
     targets: processTargetData(targetData),
+    detectedPeriod: parsePeriodFromWorkbook(workbook, salaryData),
   }
 }
 
@@ -180,7 +260,8 @@ export function downloadSampleSalaryWorkbook() {
 
 export function exportSalaryWorkbook(
   employees: EmployeeSalary[],
-  targets: EmployeeTarget[]
+  targets: EmployeeTarget[],
+  period?: SalaryPeriod
 ) {
   const salaryHeaders = [
     'اسم الموظف',
@@ -237,7 +318,9 @@ export function exportSalaryWorkbook(
     XLSX.utils.aoa_to_sheet([targetHeaders, ...targetRows]),
     'الأهداف'
   )
-  XLSX.writeFile(wb, `تقرير_المرتبات_${new Date().toISOString().slice(0, 10)}.xlsx`)
+  const activePeriod = period ?? getCurrentSalaryPeriod()
+  const monthLabel = ARABIC_MONTHS[activePeriod.month - 1] ?? activePeriod.month
+  XLSX.writeFile(wb, `تقرير_المرتبات_${monthLabel}_${activePeriod.year}.xlsx`)
 }
 
 export function buildSalaryWhatsAppMessage(
@@ -248,11 +331,13 @@ export function buildSalaryWhatsAppMessage(
   absence: number,
   absenceValue: number,
   advances: number,
-  netSalary: number
+  netSalary: number,
+  period?: SalaryPeriod
 ) {
+  const periodLabel = formatSalaryPeriod(period ?? getCurrentSalaryPeriod())
   return `مرحباً ${name}،
 
-تقرير مرتب شهر يوليو 2025:
+تقرير مرتب ${periodLabel}:
 
 - المرتب الأساسي: ${Math.round(salary)} ج.م.
 - الإضافي: ${Math.round(extra)} ج.م.
@@ -272,11 +357,13 @@ export function buildTargetWhatsAppMessage(
   actualSales: number,
   ratio: number,
   targetValue: number,
-  extraBonus: number
+  extraBonus: number,
+  period?: SalaryPeriod
 ) {
+  const periodLabel = formatSalaryPeriod(period ?? getCurrentSalaryPeriod())
   return `مرحباً ${name}،
 
-تقرير تحقيق التارجت لشهر يوليو 2025:
+تقرير تحقيق التارجت ل${periodLabel}:
 
 - المبيعات المطلوبة: ${Math.round(requiredSales)} ج.م.
 - المبيعات الفعلية: ${Math.round(actualSales)} ج.م.

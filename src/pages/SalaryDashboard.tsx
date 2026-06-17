@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import {
+  Calendar,
   Target,
   Download,
   FileDown,
@@ -9,17 +10,31 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
+  ARABIC_MONTHS,
   buildSalaryWhatsAppMessage,
   buildTargetWhatsAppMessage,
   downloadSampleSalaryWorkbook,
   exportSalaryWorkbook,
+  formatSalaryPeriodSubtitle,
+  getCurrentSalaryPeriod,
   openWhatsApp,
   parseSalaryWorkbook,
   type EmployeeSalary,
   type EmployeeTarget,
+  type SalaryPeriod,
 } from '../lib/salary'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import { Label } from '../components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select'
+
+const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => getCurrentSalaryPeriod().year - 2 + i)
 
 export default function SalaryDashboard() {
   const fileRef = useRef<HTMLInputElement>(null)
@@ -28,6 +43,13 @@ export default function SalaryDashboard() {
   const [uploading, setUploading] = useState(false)
   const [sendingAll, setSendingAll] = useState(false)
   const [sendAllRemaining, setSendAllRemaining] = useState(0)
+  const [period, setPeriod] = useState<SalaryPeriod>(getCurrentSalaryPeriod)
+  const [periodManuallySet, setPeriodManuallySet] = useState(false)
+
+  const updatePeriod = (next: Partial<SalaryPeriod>) => {
+    setPeriod((current) => ({ ...current, ...next }))
+    setPeriodManuallySet(true)
+  }
 
   const handleUpload = async () => {
     const file = fileRef.current?.files?.[0]
@@ -41,6 +63,29 @@ export default function SalaryDashboard() {
       const data = await parseSalaryWorkbook(file)
       setEmployees(data.employees)
       setTargets(data.targets)
+
+      if (data.detectedPeriod) {
+        if (periodManuallySet) {
+          const selectedLabel = formatSalaryPeriodSubtitle(period).split(' - ')[0]
+          const detectedLabel = formatSalaryPeriodSubtitle(data.detectedPeriod).split(' - ')[0]
+          if (
+            data.detectedPeriod.month !== period.month ||
+            data.detectedPeriod.year !== period.year
+          ) {
+            toast.success(
+              `تم تحميل الملف — الملف يشير إلى ${detectedLabel}، وتم استخدام ${selectedLabel} حسب اختيارك`
+            )
+            return
+          }
+        } else {
+          setPeriod(data.detectedPeriod)
+          toast.success(
+            `تم تحميل الملف — الفترة: ${formatSalaryPeriodSubtitle(data.detectedPeriod).split(' - ')[0]}`
+          )
+          return
+        }
+      }
+
       toast.success('تم تحميل الملف بنجاح')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'حدث خطأ أثناء معالجة الملف')
@@ -71,7 +116,8 @@ export default function SalaryDashboard() {
             emp.absence,
             emp.absenceValue,
             emp.advances,
-            emp.netSalary
+            emp.netSalary,
+            period
           )
         )
       }
@@ -87,7 +133,7 @@ export default function SalaryDashboard() {
     <div className="mx-auto max-w-7xl space-y-8" dir="rtl">
       <header className="rounded-xl bg-gradient-to-r from-blue-600 to-blue-400 p-6 text-white shadow-lg">
         <h1 className="text-4xl font-bold">نظام إدارة المرتبات</h1>
-        <p className="mt-2 text-blue-100">شهر يوليو 2025 - تقرير شامل للمرتبات والأهداف</p>
+        <p className="mt-2 text-blue-100">{formatSalaryPeriodSubtitle(period)}</p>
       </header>
 
       <Card>
@@ -97,7 +143,55 @@ export default function SalaryDashboard() {
             رفع ملف المرتبات
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4">
+        <CardContent className="flex flex-col gap-6">
+          <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4">
+            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-blue-900">
+              <Calendar className="h-4 w-4" />
+              فترة التقرير
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="salary-month">الشهر</Label>
+                <Select
+                  value={String(period.month)}
+                  onValueChange={(value) => updatePeriod({ month: Number(value) })}
+                >
+                  <SelectTrigger id="salary-month">
+                    <SelectValue placeholder="اختر الشهر" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ARABIC_MONTHS.map((monthName, index) => (
+                      <SelectItem key={monthName} value={String(index + 1)}>
+                        {monthName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="salary-year">السنة</Label>
+                <Select
+                  value={String(period.year)}
+                  onValueChange={(value) => updatePeriod({ year: Number(value) })}
+                >
+                  <SelectTrigger id="salary-year">
+                    <SelectValue placeholder="اختر السنة" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {YEAR_OPTIONS.map((year) => (
+                      <SelectItem key={year} value={String(year)}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-blue-700/80">
+              اختر الشهر والسنة قبل الرفع. إذا احتوى الملف على تاريخ، يُطبَّق تلقائياً ما لم تُغيّر
+              الفترة يدوياً.
+            </p>
+          </div>
           <div className="flex flex-col items-center gap-4 md:flex-row">
             <input
               ref={fileRef}
@@ -136,7 +230,7 @@ export default function SalaryDashboard() {
         <Button
           variant="outline"
           className="rounded-full px-6"
-          onClick={() => exportSalaryWorkbook(employees, targets)}
+          onClick={() => exportSalaryWorkbook(employees, targets, period)}
           disabled={employees.length === 0}
         >
           <Download className="h-4 w-4" />
@@ -218,7 +312,8 @@ export default function SalaryDashboard() {
                               emp.absence,
                               emp.absenceValue,
                               emp.advances,
-                              emp.netSalary
+                              emp.netSalary,
+                              period
                             )
                           )
                         }}
@@ -303,7 +398,8 @@ export default function SalaryDashboard() {
                               target.actualSales,
                               target.ratio,
                               target.targetValue,
-                              target.extraBonus
+                              target.extraBonus,
+                              period
                             )
                           )
                         }}
