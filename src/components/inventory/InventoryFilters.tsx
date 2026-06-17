@@ -1,5 +1,7 @@
 import { ChevronDown, Filter, Search, SlidersHorizontal, X } from 'lucide-react'
-import { BRANCHES, INVENTORY_GROUPS } from '../../lib/constants'
+import { BRANCHES } from '../../lib/constants'
+import type { InventoryGroup } from '../../lib/supabase'
+import { findGroupName } from '../../lib/inventoryGroups'
 import {
   DEFAULT_INVENTORY_FILTERS,
   SORT_FIELD_OPTIONS,
@@ -43,15 +45,18 @@ interface InventoryFiltersProps {
   hasResults: boolean
   currentBranchId?: number
   currentGroupId?: number
+  inventoryGroups: InventoryGroup[]
 }
 
 function FilterFields({
   filters,
   onFiltersChange,
+  inventoryGroups,
   compact = false,
 }: {
   filters: InventoryFilterState
   onFiltersChange: (filters: InventoryFilterState) => void
+  inventoryGroups: InventoryGroup[]
   compact?: boolean
 }) {
   const update = (partial: Partial<InventoryFilterState>) => {
@@ -125,7 +130,7 @@ function FilterFields({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">جميع المجموعات</SelectItem>
-            {INVENTORY_GROUPS.map((group) => (
+            {inventoryGroups.map((group) => (
               <SelectItem key={group.id} value={String(group.id)}>
                 {group.name}
               </SelectItem>
@@ -252,6 +257,7 @@ export function InventoryFilters({
   hasResults,
   currentBranchId,
   currentGroupId,
+  inventoryGroups,
 }: InventoryFiltersProps) {
   const contextLabel =
     currentBranchId || currentGroupId
@@ -259,9 +265,7 @@ export function InventoryFilters({
           currentBranchId
             ? BRANCHES.find((branch) => branch.id === currentBranchId)?.name
             : null,
-          currentGroupId
-            ? INVENTORY_GROUPS.find((group) => group.id === currentGroupId)?.name
-            : null,
+          currentGroupId ? findGroupName(inventoryGroups, currentGroupId) : null,
         ]
           .filter(Boolean)
           .join(' • ')
@@ -307,6 +311,7 @@ export function InventoryFilters({
                 <FilterFields
                   filters={filters}
                   onFiltersChange={onFiltersChange}
+                  inventoryGroups={inventoryGroups}
                   compact
                 />
               </div>
@@ -364,7 +369,7 @@ export function InventoryFilters({
 
           <CollapsibleContent>
             <div className="space-y-4 border-t border-gray-100 px-5 py-5">
-              <FilterFields filters={filters} onFiltersChange={onFiltersChange} />
+              <FilterFields filters={filters} onFiltersChange={onFiltersChange} inventoryGroups={inventoryGroups} />
               <div className="flex justify-end">
                 <Button
                   type="button"
@@ -383,7 +388,7 @@ export function InventoryFilters({
 
       <div className="hidden sm:block lg:hidden">
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <FilterFields filters={filters} onFiltersChange={onFiltersChange} compact />
+          <FilterFields filters={filters} onFiltersChange={onFiltersChange} inventoryGroups={inventoryGroups} compact />
           {activeFilterCount > 0 && (
             <div className="mt-4 flex justify-end">
               <Button type="button" variant="outline" size="sm" onClick={onClearAll}>

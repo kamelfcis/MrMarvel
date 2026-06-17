@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Archive, DollarSign, LogOut, Menu, Settings, Users, X } from 'lucide-react'
+import { Archive, DollarSign, Layers, LogOut, Menu, Settings, Users, X } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../ui/button'
@@ -15,6 +15,7 @@ export function AppLayout() {
       ? [
           { to: '/salary', label: 'إدارة المرتبات', icon: DollarSign },
           { to: '/admin/users', label: 'إدارة المستخدمين', icon: Users },
+          { to: '/admin/inventory-groups', label: 'مجموعات الجرد', icon: Layers },
         ]
       : []),
     { to: '/settings', label: 'الإعدادات', icon: Settings },

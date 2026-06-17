@@ -1,5 +1,6 @@
-import type { InventoryCount } from './supabase'
-import { BRANCHES, INVENTORY_GROUPS } from './constants'
+import type { InventoryCount, InventoryGroup } from './supabase'
+import { BRANCHES } from './constants'
+import { findGroupName } from './inventoryGroups'
 
 export type SavedInventorySort = 'newest' | 'oldest' | 'name' | 'branch'
 
@@ -116,7 +117,8 @@ export interface SavedFilterChip {
 
 export function getSavedInventoryFilterChips(
   filters: SavedInventoryFilterState,
-  creatorName?: string
+  creatorName?: string,
+  inventoryGroups: InventoryGroup[] = []
 ): SavedFilterChip[] {
   const chips: SavedFilterChip[] = []
 
@@ -128,7 +130,7 @@ export function getSavedInventoryFilterChips(
     chips.push({ key: 'branchId', label: `الفرع: ${branchName ?? filters.branchId}` })
   }
   if (filters.groupId !== 'all') {
-    const groupName = INVENTORY_GROUPS.find((g) => String(g.id) === filters.groupId)?.name
+    const groupName = findGroupName(inventoryGroups, filters.groupId)
     chips.push({ key: 'groupId', label: `المجموعة: ${groupName ?? filters.groupId}` })
   }
   if (filters.creatorId !== 'all') {

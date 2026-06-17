@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom'
 import {
   Calculator,
   DollarSign,
+  Layers,
   Settings,
   Users,
   FileSpreadsheet,
@@ -36,7 +37,9 @@ import {
   exportInventoryToExcel,
   readExcelFile,
 } from '../lib/inventory'
-import { BRANCHES, INVENTORY_GROUPS } from '../lib/constants'
+import { BRANCHES } from '../lib/constants'
+import { findGroupName } from '../lib/inventoryGroups'
+import { useInventoryGroups } from '../hooks/useInventoryGroups'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import {
@@ -67,6 +70,7 @@ ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Le
 
 export default function InventoryDashboard() {
   const { user, profile, signOut, isSuperAdmin } = useAuth()
+  const { groups: inventoryGroups } = useInventoryGroups()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [branchId, setBranchId] = useState('')
   const [groupId, setGroupId] = useState('')
@@ -98,11 +102,9 @@ export default function InventoryDashboard() {
 
   const filterChips = useMemo(() => {
     const branchName = BRANCHES.find((branch) => branch.id === Number(filters.branchId))?.name
-    const groupName = INVENTORY_GROUPS.find(
-      (group) => group.id === Number(filters.groupId)
-    )?.name
+    const groupName = findGroupName(inventoryGroups, filters.groupId)
     return getActiveFilterChips(filters, branchName, groupName)
-  }, [filters])
+  }, [filters, inventoryGroups])
 
   const totalPages = Math.max(1, Math.ceil(filteredResults.length / pageSize))
   const safeCurrentPage = Math.min(currentPage, totalPages)
@@ -383,8 +385,7 @@ export default function InventoryDashboard() {
       return
     }
     const branchName = BRANCHES.find((b) => b.id === currentInventory.branchId)?.name || ''
-    const groupName =
-      INVENTORY_GROUPS.find((g) => g.id === currentInventory.inventoryGroupId)?.name || ''
+    const groupName = findGroupName(inventoryGroups, currentInventory.inventoryGroupId) || ''
     exportInventoryToExcel(results, branchName, groupName)
   }
 
@@ -453,7 +454,7 @@ export default function InventoryDashboard() {
                 className="w-full rounded-lg border border-blue-600 bg-blue-700 p-2 text-white"
               >
                 <option value="">-- اختر المجموعة --</option>
-                {INVENTORY_GROUPS.map((g) => (
+                {inventoryGroups.map((g) => (
                   <option key={g.id} value={String(g.id)}>
                     {g.name}
                   </option>
@@ -507,6 +508,13 @@ export default function InventoryDashboard() {
               >
                 <Users className="h-4 w-4" />
                 إدارة المستخدمين
+              </Link>
+              <Link
+                to="/admin/inventory-groups"
+                className="flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm transition hover:bg-blue-600"
+              >
+                <Layers className="h-4 w-4" />
+                مجموعات الجرد
               </Link>
             </>
           )}
@@ -617,6 +625,7 @@ export default function InventoryDashboard() {
               hasResults={results.length > 0}
               currentBranchId={currentInventory?.branchId}
               currentGroupId={currentInventory?.inventoryGroupId}
+              inventoryGroups={inventoryGroups}
             />
 
             <InventoryResultsTable

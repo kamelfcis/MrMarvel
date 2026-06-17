@@ -14,7 +14,8 @@ import {
   X,
 } from 'lucide-react'
 import type { InventoryCount } from '../../lib/supabase'
-import { BRANCHES, INVENTORY_GROUPS } from '../../lib/constants'
+import { BRANCHES } from '../../lib/constants'
+import { useInventoryGroups } from '../../hooks/useInventoryGroups'
 import {
   applySavedInventoryFilters,
   clearSavedInventoryFilterKey,
@@ -147,12 +148,14 @@ function FilterFields({
   onFiltersChange,
   creators,
   showCreatorFilter,
+  inventoryGroups,
   compact = false,
 }: {
   filters: SavedInventoryFilterState
   onFiltersChange: (filters: SavedInventoryFilterState) => void
   creators: { id: string; name: string }[]
   showCreatorFilter: boolean
+  inventoryGroups: { id: number; name: string }[]
   compact?: boolean
 }) {
   const update = (partial: Partial<SavedInventoryFilterState>) => {
@@ -205,7 +208,7 @@ function FilterFields({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">جميع المجموعات</SelectItem>
-            {INVENTORY_GROUPS.map((group) => (
+            {inventoryGroups.map((group) => (
               <SelectItem key={group.id} value={String(group.id)}>
                 {group.name}
               </SelectItem>
@@ -538,6 +541,7 @@ export function SavedInventoriesModal({
   onView,
   onDelete,
 }: SavedInventoriesModalProps) {
+  const { groups: inventoryGroups } = useInventoryGroups()
   const [filters, setFilters] = useState<SavedInventoryFilterState>(
     DEFAULT_SAVED_INVENTORY_FILTERS
   )
@@ -573,7 +577,7 @@ export function SavedInventoriesModal({
     return creators.find((c) => c.id === filters.creatorId)?.name
   }, [filters.creatorId, creators])
 
-  const filterChips = getSavedInventoryFilterChips(filters, creatorNameForChip)
+  const filterChips = getSavedInventoryFilterChips(filters, creatorNameForChip, inventoryGroups)
 
   const handleDeleteConfirm = () => {
     if (deleteConfirmId !== null) {
@@ -670,6 +674,7 @@ export function SavedInventoriesModal({
                         }}
                         creators={creators}
                         showCreatorFilter
+                        inventoryGroups={inventoryGroups}
                         compact
                       />
                     </div>
@@ -742,6 +747,7 @@ export function SavedInventoriesModal({
                       }}
                       creators={creators}
                       showCreatorFilter
+                      inventoryGroups={inventoryGroups}
                     />
                     <div className="flex justify-end">
                       <Button

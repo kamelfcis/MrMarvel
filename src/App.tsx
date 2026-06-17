@@ -8,6 +8,7 @@ import InventoryDashboard from './pages/InventoryDashboard'
 import SalaryDashboard from './pages/SalaryDashboard'
 import SettingsPage from './pages/SettingsPage'
 import AdminUsersPage from './pages/AdminUsersPage'
+import AdminInventoryGroupsPage from './pages/AdminInventoryGroupsPage'
 
 function RootRedirect() {
   const { session, loading } = useAuth()
@@ -28,6 +29,7 @@ export default function App() {
               <Route element={<ProtectedRoute roles={['super_admin']} />}>
                 <Route path="/salary" element={<SalaryDashboard />} />
                 <Route path="/admin/users" element={<AdminUsersPage />} />
+                <Route path="/admin/inventory-groups" element={<AdminInventoryGroupsPage />} />
               </Route>
             </Route>
           </Route>
