@@ -17,6 +17,7 @@ import {
   Settings,
   Users,
   FileSpreadsheet,
+  BarChart3,
   History,
   LogOut,
   Menu,
@@ -522,6 +523,13 @@ export default function InventoryDashboard() {
               >
                 <FileSpreadsheet className="h-4 w-4" />
                 جرد الفواتير
+              </Link>
+              <Link
+                to="/admin/invoice-stats"
+                className="flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm transition hover:bg-blue-600"
+              >
+                <BarChart3 className="h-4 w-4" />
+                احصائيات الفواتير
               </Link>
             </>
           )}

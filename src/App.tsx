@@ -10,6 +10,7 @@ import SettingsPage from './pages/SettingsPage'
 import AdminUsersPage from './pages/AdminUsersPage'
 import AdminInventoryGroupsPage from './pages/AdminInventoryGroupsPage'
 import AdminInvoicesPage from './pages/AdminInvoicesPage'
+import AdminInvoiceStatsPage from './pages/AdminInvoiceStatsPage'
 
 function RootRedirect() {
   const { session, loading } = useAuth()
@@ -32,6 +33,7 @@ export default function App() {
                 <Route path="/admin/users" element={<AdminUsersPage />} />
                 <Route path="/admin/inventory-groups" element={<AdminInventoryGroupsPage />} />
                 <Route path="/admin/invoices" element={<AdminInvoicesPage />} />
+                <Route path="/admin/invoice-stats" element={<AdminInvoiceStatsPage />} />
               </Route>
             </Route>
           </Route>
