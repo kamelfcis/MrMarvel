@@ -19,7 +19,7 @@ export const INVOICE_SORT_OPTIONS: { value: InvoiceSortField; label: string }[] 
   { value: 'invoice_number', label: 'رقم الفاتورة' },
   { value: 'branch_name', label: 'الفرع' },
   { value: 'seller_name', label: 'البائع' },
-  { value: 'customer_mobile', label: 'رقم الموبيل' },
+  { value: 'customer_mobile', label: 'موبيل العميل' },
   { value: 'invoice_date', label: 'التاريخ' },
   { value: 'line_items_count', label: 'البنود' },
   { value: 'total_net_sales', label: 'صافي المبيعات' },

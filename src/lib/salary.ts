@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import { buildWhatsAppChatUrl } from './whatsapp'
 
 /** Arabic month names (January–December) for headers and WhatsApp messages. */
 export const ARABIC_MONTHS = [
@@ -378,13 +379,6 @@ export function buildTargetWhatsAppMessage(
 }
 
 export function openWhatsApp(phone: string, message: string) {
-  const encodedMessage = encodeURIComponent(message)
-    .replace(/'/g, '%27')
-    .replace(/\(/g, '%28')
-    .replace(/\)/g, '%29')
-    .replace(/\*/g, '%2A')
-    .replace(/\n/g, '%0A')
-
-  const cleanPhone = phone.replace(/\D/g, '')
-  window.open(`https://wa.me/${cleanPhone}?text=${encodedMessage}`, '_blank')
+  const url = buildWhatsAppChatUrl(phone, message)
+  if (url) window.open(url, '_blank', 'noopener,noreferrer')
 }
