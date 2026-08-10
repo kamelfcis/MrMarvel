@@ -22,6 +22,7 @@ import XLSX from 'xlsx'
 import {
   SALES_BATCH_SIZE,
   SALES_XLSX_READ_OPTS,
+  parseSaleDate,
   parseSalesWorkbook,
   salesDedupeKey,
   transformSalesRawRows,
@@ -108,6 +109,15 @@ async function main() {
   const workbook = XLSX.readFile(filePath, SALES_XLSX_READ_OPTS)
   const { sheetName, rawRows } = parseSalesWorkbook(workbook)
   console.log(`Sheet "${sheetName}": ${rawRows.length} data rows`)
+
+  console.log('Date parse samples (mm/dd slash strings):')
+  for (const sample of ['08/09/2026', '9/8/26', '10/8/26']) {
+    console.log(`  ${sample} → ${parseSaleDate(sample)}`)
+  }
+  const dateHeader = 'التاريخ'
+  for (const raw of rawRows.slice(0, 3)) {
+    console.log(`  Excel row: ${JSON.stringify(raw[dateHeader])} → ${parseSaleDate(raw[dateHeader])}`)
+  }
 
   const { rows: mapped, skipped, warnings } = transformSalesRawRows(rawRows)
 

@@ -1,5 +1,5 @@
 import * as XLSXImport from 'xlsx'
-import type { ParsingOptions, WorkBook } from 'xlsx'
+import type { CellObject, ParsingOptions, WorkBook, WorkSheet } from 'xlsx'
 
 // Vite: named exports on the namespace (incl. SSF). Node CJS interop: API lives on `.default`.
 const XLSX = (() => {
@@ -38,6 +38,9 @@ export const SALES_COLUMN_MAP = {
 export const SALES_EXPECTED_HEADERS = Object.keys(SALES_COLUMN_MAP)
 
 export const SALES_BATCH_SIZE = 400
+
+/** Arabic header for the sale date column in sales Excel exports. */
+export const SALES_DATE_HEADER = 'التاريخ'
 
 const NUMERIC_FIELDS = new Set([
   'sales_amount',
@@ -245,10 +248,10 @@ function toIsoDateParts(year: number, month: number, day: number): string | null
 }
 
 /**
- * Parse US-style mm/dd/yyyy display strings from Excel (month first, day second).
- * Examples: "9/8/26" → 2026-09-08, "09/08/2026" → 2026-09-08. Do not swap day/month.
+ * Parse mm/dd/yyyy slash strings (month first, day second — never swap).
+ * Examples: "08/09/2026" → 2026-08-09, "9/8/26" → 2026-09-08.
  */
-function parseUsSlashDateString(trimmed: string): string | null {
+export function parseUsSlashDateString(trimmed: string): string | null {
   const match = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/)
   if (!match) return null
 
@@ -262,21 +265,24 @@ function parseUsSlashDateString(trimmed: string): string | null {
   return toIsoDateParts(year, month, day)
 }
 
+function parseSaleDateFromSerial(serial: number): string | null {
+  if (!XLSX.SSF?.format) {
+    const parsed = XLSX.SSF?.parse_date_code(serial)
+    return parsed ? toIsoDateParts(parsed.y, parsed.m, parsed.d) : null
+  }
+
+  // Excel often shows dd/mm/yyyy (e.g. 08/09/2026) while the raw serial is US m/d.
+  // Format as dd/mm/yyyy, then parse that display text as mm/dd/yyyy.
+  const display = XLSX.SSF.format('dd/mm/yyyy', serial)
+  const fromDisplay = parseUsSlashDateString(display)
+  if (fromDisplay) return fromDisplay
+
+  const parsed = XLSX.SSF.parse_date_code(serial)
+  return parsed ? toIsoDateParts(parsed.y, parsed.m, parsed.d) : null
+}
+
 export function parseSaleDate(value: unknown): string | null {
   if (value == null || value === '') return null
-
-  // Excel serial (e.g. 46273): SSF uses US mm/dd — 46273 = 9/8/2026 → 2026-09-08.
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    const parsed = XLSX.SSF.parse_date_code(value)
-    if (parsed) {
-      return toIsoDateParts(parsed.y, parsed.m, parsed.d)
-    }
-  }
-
-  // Fallback only: SheetJS Date objects are UTC-based for Excel serials.
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return toIsoDateParts(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate())
-  }
 
   if (typeof value === 'string') {
     const trimmed = value.trim()
@@ -287,11 +293,61 @@ export function parseSaleDate(value: unknown): string | null {
     if (slashParsed) return slashParsed
     const asNum = Number(trimmed)
     if (Number.isFinite(asNum) && asNum > 20000 && asNum < 80000) {
-      return parseSaleDate(asNum)
+      return parseSaleDateFromSerial(asNum)
     }
   }
 
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return parseSaleDateFromSerial(value)
+  }
+
+  // Fallback only: SheetJS Date objects are UTC-based for Excel serials.
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return toIsoDateParts(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate())
+  }
+
   return null
+}
+
+/** Prefer formatted cell text; for serials use dd/mm/yyyy display then mm/dd parse. */
+export function saleDateValueFromCell(cell: CellObject | undefined): unknown {
+  if (!cell) return null
+
+  if (cell.t === 'n' && typeof cell.v === 'number' && Number.isFinite(cell.v)) {
+    if (XLSX.SSF?.format) {
+      return XLSX.SSF.format('dd/mm/yyyy', cell.v)
+    }
+    return cell.v
+  }
+
+  if (cell.w) return cell.w
+  if (cell.v != null && cell.v !== '') return cell.v
+  return null
+}
+
+function applyFormattedSaleDates(sheet: WorkSheet, rawRows: Record<string, unknown>[]): void {
+  const ref = sheet['!ref']
+  if (!ref) return
+
+  const range = XLSX.utils.decode_range(ref)
+  let dateCol = -1
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const headerCell = sheet[XLSX.utils.encode_cell({ r: range.s.r, c })]
+    if (headerCell && String(headerCell.v).trim() === SALES_DATE_HEADER) {
+      dateCol = c
+      break
+    }
+  }
+  if (dateCol < 0) return
+
+  for (let i = 0; i < rawRows.length; i++) {
+    const rowIndex = range.s.r + 1 + i
+    const cell = sheet[XLSX.utils.encode_cell({ r: rowIndex, c: dateCol })]
+    const formatted = saleDateValueFromCell(cell)
+    if (formatted != null && formatted !== '') {
+      rawRows[i][SALES_DATE_HEADER] = formatted
+    }
+  }
 }
 
 export function salesDedupeKey(row: Pick<SalesDetailInsert, 'invoice_number' | 'item_name' | 'color' | 'size' | 'sold_qty'>): string {
@@ -361,14 +417,15 @@ export function parseSalesWorkbook(
     defval: null,
     raw: true,
   })
+  applyFormattedSaleDates(sheet, rawRows)
   return { sheetName: resolvedSheet, rawRows }
 }
 
-/** Shared SheetJS read options: keep Excel date serials (no TZ Date objects). */
+/** Shared SheetJS read options: formatted text for dates, no TZ Date objects. */
 export const SALES_XLSX_READ_OPTS: ParsingOptions = {
   cellDates: false,
-  cellNF: false,
-  cellText: false,
+  cellNF: true,
+  cellText: true,
 }
 
 export function parseSalesExcelBuffer(buffer: ArrayBuffer): SalesImportResult {

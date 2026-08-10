@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "import:sales": "node --experimental-strip-types --env-file=.env scripts/import-sales.mjs"
+    "import:sales": "node --experimental-strip-types --env-file=.env scripts/import-sales.mjs",
+    "clear:sales": "node --env-file=.env scripts/clear-sales.mjs"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.5",

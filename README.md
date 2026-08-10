@@ -96,6 +96,17 @@ npm run import:sales -- "New Microsoft Excel Worksheet (4).xlsx"
 
 The script rebuilds Date-corrupted `invoice_number` values, pads `customer_mobile` to 11 digits, parses Excel serial `sale_date`s, deletes existing `sales_details` rows, then inserts in batches of ~400.
 
+
+### Clear sales data (re-import)
+
+To wipe invoice inventory before a fresh Excel import:
+
+```bash
+npm run clear:sales
+```
+
+Then run `npm run import:sales` again.
+
 ### 4. Expected validation
 
 ```sql
