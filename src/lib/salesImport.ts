@@ -236,26 +236,46 @@ export function fixInvoiceNumber(value: unknown, warnings: string[]): string | n
   return asString || null
 }
 
+/** Build ISO date-only string from calendar parts (no timezone). */
+function toIsoDateParts(year: number, month: number, day: number): string | null {
+  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900 || year > 2100) {
+    return null
+  }
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+/**
+ * Parse US-style mm/dd/yyyy display strings from Excel (month first, day second).
+ * Examples: "9/8/26" → 2026-09-08, "09/08/2026" → 2026-09-08. Do not swap day/month.
+ */
+function parseUsSlashDateString(trimmed: string): string | null {
+  const match = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/)
+  if (!match) return null
+
+  const month = Number(match[1])
+  const day = Number(match[2])
+  let year = Number(match[3])
+  if (match[3].length === 2) {
+    year += year >= 70 ? 1900 : 2000
+  }
+
+  return toIsoDateParts(year, month, day)
+}
+
 export function parseSaleDate(value: unknown): string | null {
   if (value == null || value === '') return null
 
-  // Prefer Excel serial → SSF calendar parts (no JS timezone).
+  // Excel serial (e.g. 46273): SSF uses US mm/dd — 46273 = 9/8/2026 → 2026-09-08.
   if (typeof value === 'number' && Number.isFinite(value)) {
     const parsed = XLSX.SSF.parse_date_code(value)
     if (parsed) {
-      const y = parsed.y
-      const m = String(parsed.m).padStart(2, '0')
-      const d = String(parsed.d).padStart(2, '0')
-      return `${y}-${m}-${d}`
+      return toIsoDateParts(parsed.y, parsed.m, parsed.d)
     }
   }
 
   // Fallback only: SheetJS Date objects are UTC-based for Excel serials.
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    const y = value.getUTCFullYear()
-    const m = String(value.getUTCMonth() + 1).padStart(2, '0')
-    const d = String(value.getUTCDate()).padStart(2, '0')
-    return `${y}-${m}-${d}`
+    return toIsoDateParts(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate())
   }
 
   if (typeof value === 'string') {
@@ -263,6 +283,8 @@ export function parseSaleDate(value: unknown): string | null {
     if (!trimmed) return null
     // ISO date-only: take as-is, no new Date() round-trip.
     if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10)
+    const slashParsed = parseUsSlashDateString(trimmed)
+    if (slashParsed) return slashParsed
     const asNum = Number(trimmed)
     if (Number.isFinite(asNum) && asNum > 20000 && asNum < 80000) {
       return parseSaleDate(asNum)
