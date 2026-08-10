@@ -81,3 +81,29 @@ export interface CurrentInventoryResults {
   inventoryGroupId: number
   results: InventoryResultItem[]
 }
+
+export interface InvoiceSummary {
+  invoice_number: string
+  branch_name: string | null
+  seller_name: string | null
+  invoice_date: string | null
+  line_items_count: number
+  total_qty: number | null
+  total_net_sales: number | null
+  total_discount: number | null
+  total_returns: number | null
+}
+
+export interface SalesDetailLine {
+  id: number
+  item_name: string | null
+  item_category: string | null
+  color: string | null
+  size: string | null
+  sold_qty: number | null
+  unit_price: number | null
+  net_sales_amount: number | null
+  discount_pct: number | null
+  discount_amount: number | null
+  returns_amount: number | null
+}

@@ -516,6 +516,13 @@ export default function InventoryDashboard() {
                 <Layers className="h-4 w-4" />
                 مجموعات الجرد
               </Link>
+              <Link
+                to="/admin/invoices"
+                className="flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm transition hover:bg-blue-600"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                جرد الفواتير
+              </Link>
             </>
           )}
           <Link

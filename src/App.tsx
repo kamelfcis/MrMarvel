@@ -9,6 +9,7 @@ import SalaryDashboard from './pages/SalaryDashboard'
 import SettingsPage from './pages/SettingsPage'
 import AdminUsersPage from './pages/AdminUsersPage'
 import AdminInventoryGroupsPage from './pages/AdminInventoryGroupsPage'
+import AdminInvoicesPage from './pages/AdminInvoicesPage'
 
 function RootRedirect() {
   const { session, loading } = useAuth()
@@ -30,6 +31,7 @@ export default function App() {
                 <Route path="/salary" element={<SalaryDashboard />} />
                 <Route path="/admin/users" element={<AdminUsersPage />} />
                 <Route path="/admin/inventory-groups" element={<AdminInventoryGroupsPage />} />
+                <Route path="/admin/invoices" element={<AdminInvoicesPage />} />
               </Route>
             </Route>
           </Route>

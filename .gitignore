@@ -4,3 +4,11 @@ dist
 .env.local
 *.log
 .DS_Store
+
+# Local secrets / probe artifacts
+.supabase-access-token
+.db-password.txt
+.candidate-tokens.txt
+.oicy-user-session.json
+.browser-supabase-cookies.jsonl
+
