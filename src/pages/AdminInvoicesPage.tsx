@@ -60,6 +60,18 @@ function formatCurrency(value: number | null | undefined) {
 function formatDate(value: string | null | undefined) {
   if (!value) return '—'
   try {
+    // YYYY-MM-DD is a calendar date — parse as local components (avoid UTC midnight shift).
+    const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
+    if (iso) {
+      const y = Number(iso[1])
+      const m = Number(iso[2])
+      const d = Number(iso[3])
+      return new Date(y, m - 1, d).toLocaleDateString('ar-EG', {
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+      })
+    }
     return new Date(value).toLocaleDateString('ar-EG')
   } catch {
     return value

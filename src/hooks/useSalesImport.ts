@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import {
   SALES_BATCH_SIZE,
   SALES_EXPECTED_HEADERS,
+  SALES_XLSX_READ_OPTS,
   salesDedupeKey,
   readSalesExcelFile,
   validateSalesColumns,
@@ -73,7 +74,7 @@ export function useSalesImport(onSuccess?: () => void) {
 
       try {
         const buffer = await file.arrayBuffer()
-        const workbook = XLSX.read(buffer, { cellDates: true, cellNF: false, cellText: false })
+        const workbook = XLSX.read(buffer, SALES_XLSX_READ_OPTS)
         const sheetName = workbook.SheetNames.includes('Sheet1')
           ? 'Sheet1'
           : workbook.SheetNames[0]
@@ -88,6 +89,7 @@ export function useSalesImport(onSuccess?: () => void) {
           return
         }
 
+        // Shared parser: cellDates false + SSF serial → YYYY-MM-DD
         const { rows, skipped, warnings } = await readSalesExcelFile(file)
 
         setProgress({ phase: 'deduping', percent: 25, message: 'جاري التحقق من التكرار...' })

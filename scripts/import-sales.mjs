@@ -21,6 +21,7 @@ import { createClient } from '@supabase/supabase-js'
 import XLSX from 'xlsx'
 import {
   SALES_BATCH_SIZE,
+  SALES_XLSX_READ_OPTS,
   parseSalesWorkbook,
   salesDedupeKey,
   transformSalesRawRows,
@@ -104,15 +105,21 @@ async function main() {
   }
 
   console.log(`Reading: ${filePath}`)
-  const workbook = XLSX.readFile(filePath, {
-    cellDates: true,
-    cellNF: false,
-    cellText: false,
-  })
+  const workbook = XLSX.readFile(filePath, SALES_XLSX_READ_OPTS)
   const { sheetName, rawRows } = parseSalesWorkbook(workbook)
   console.log(`Sheet "${sheetName}": ${rawRows.length} data rows`)
 
   const { rows: mapped, skipped, warnings } = transformSalesRawRows(rawRows)
+
+  const saleDateCounts = new Map()
+  for (const row of mapped) {
+    const d = row.sale_date || '(null)'
+    saleDateCounts.set(d, (saleDateCounts.get(d) || 0) + 1)
+  }
+  console.log('sale_date distribution (parsed):')
+  for (const [d, count] of [...saleDateCounts.entries()].sort((a, b) => String(a[0]).localeCompare(String(b[0])))) {
+    console.log(`  ${d}: ${count}`)
+  }
 
   const prefixCounts = new Map()
   for (const row of mapped) {

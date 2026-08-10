@@ -1,4 +1,14 @@
-import * as XLSX from 'xlsx'
+import * as XLSXImport from 'xlsx'
+import type { ParsingOptions, WorkBook } from 'xlsx'
+
+// Vite: named exports on the namespace (incl. SSF). Node CJS interop: API lives on `.default`.
+const XLSX = (() => {
+  const ns = XLSXImport as unknown as {
+    SSF?: { parse_date_code: (n: number) => unknown }
+    default?: typeof XLSXImport
+  }
+  return ns.SSF ? (XLSXImport as typeof XLSXImport) : (ns.default ?? XLSXImport)
+})()
 
 export const SALES_COLUMN_MAP = {
   'اسم الفرع': 'branch_name',
@@ -154,13 +164,7 @@ export function fixInvoiceNumber(value: unknown, warnings: string[]): string | n
 export function parseSaleDate(value: unknown): string | null {
   if (value == null || value === '') return null
 
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    const y = value.getFullYear()
-    const m = String(value.getMonth() + 1).padStart(2, '0')
-    const d = String(value.getDate()).padStart(2, '0')
-    return `${y}-${m}-${d}`
-  }
-
+  // Prefer Excel serial → SSF calendar parts (no JS timezone).
   if (typeof value === 'number' && Number.isFinite(value)) {
     const parsed = XLSX.SSF.parse_date_code(value)
     if (parsed) {
@@ -171,9 +175,18 @@ export function parseSaleDate(value: unknown): string | null {
     }
   }
 
+  // Fallback only: SheetJS Date objects are UTC-based for Excel serials.
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const y = value.getUTCFullYear()
+    const m = String(value.getUTCMonth() + 1).padStart(2, '0')
+    const d = String(value.getUTCDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+
   if (typeof value === 'string') {
     const trimmed = value.trim()
     if (!trimmed) return null
+    // ISO date-only: take as-is, no new Date() round-trip.
     if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10)
     const asNum = Number(trimmed)
     if (Number.isFinite(asNum) && asNum > 20000 && asNum < 80000) {
@@ -240,7 +253,7 @@ export function validateSalesColumns(headers: string[]): { valid: boolean; missi
 }
 
 export function parseSalesWorkbook(
-  workbook: XLSX.WorkBook,
+  workbook: WorkBook,
   sheetName?: string,
 ): { sheetName: string; rawRows: Record<string, unknown>[] } {
   const resolvedSheet =
@@ -254,12 +267,15 @@ export function parseSalesWorkbook(
   return { sheetName: resolvedSheet, rawRows }
 }
 
+/** Shared SheetJS read options: keep Excel date serials (no TZ Date objects). */
+export const SALES_XLSX_READ_OPTS: ParsingOptions = {
+  cellDates: false,
+  cellNF: false,
+  cellText: false,
+}
+
 export function parseSalesExcelBuffer(buffer: ArrayBuffer): SalesImportResult {
-  const workbook = XLSX.read(buffer, {
-    cellDates: true,
-    cellNF: false,
-    cellText: false,
-  })
+  const workbook = XLSX.read(buffer, SALES_XLSX_READ_OPTS)
   const { rawRows } = parseSalesWorkbook(workbook)
   return transformSalesRawRows(rawRows)
 }
