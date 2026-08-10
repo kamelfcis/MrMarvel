@@ -5,14 +5,38 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/** Format YYYY-MM-DD (or Date / ISO strings) as dd/mm/yyyy in ar-EG (day/month/year). */
+export function formatDateDMY(value: string | Date | null | undefined): string {
+  if (value == null || value === '') return '—'
+  try {
+    let date: Date
+    if (value instanceof Date) {
+      date = value
+    } else {
+      const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
+      if (iso) {
+        const y = Number(iso[1])
+        const m = Number(iso[2])
+        const d = Number(iso[3])
+        date = new Date(y, m - 1, d)
+      } else {
+        date = new Date(value)
+      }
+    }
+    if (Number.isNaN(date.getTime())) return String(value)
+    return date.toLocaleDateString('ar-EG', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
+  } catch {
+    return String(value)
+  }
+}
+
+/** @deprecated Prefer formatDateDMY — kept for existing imports. */
 export function formatDate(dateString: string) {
-  return new Date(dateString).toLocaleDateString('ar-EG', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDateDMY(dateString)
 }
 
 export function getAccuracyColorClass(accuracy: number) {

@@ -35,6 +35,7 @@ import {
 import { cn } from '../components/ui/utils'
 import { useSalesImport } from '../hooks/useSalesImport'
 import { supabase, type InvoiceSummary } from '../lib/supabase'
+import { formatDateDMY } from '../lib/utils'
 
 type InvoiceFilters = {
   branch: string
@@ -55,27 +56,6 @@ const emptyFilters: InvoiceFilters = {
 function formatCurrency(value: number | null | undefined) {
   if (value == null) return '—'
   return `${value.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`
-}
-
-function formatDate(value: string | null | undefined) {
-  if (!value) return '—'
-  try {
-    // YYYY-MM-DD is a calendar date — parse as local components (avoid UTC midnight shift).
-    const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
-    if (iso) {
-      const y = Number(iso[1])
-      const m = Number(iso[2])
-      const d = Number(iso[3])
-      return new Date(y, m - 1, d).toLocaleDateString('ar-EG', {
-        year: 'numeric',
-        month: 'numeric',
-        day: 'numeric',
-      })
-    }
-    return new Date(value).toLocaleDateString('ar-EG')
-  } catch {
-    return value
-  }
 }
 
 function TableSkeleton() {
@@ -287,8 +267,8 @@ export default function AdminInvoicesPage() {
     const chips: Array<{ key: keyof InvoiceFilters; label: string }> = []
     if (filters.branch) chips.push({ key: 'branch', label: `الفرع: ${filters.branch}` })
     if (filters.seller) chips.push({ key: 'seller', label: `البائع: ${filters.seller}` })
-    if (filters.dateFrom) chips.push({ key: 'dateFrom', label: `من: ${filters.dateFrom}` })
-    if (filters.dateTo) chips.push({ key: 'dateTo', label: `إلى: ${filters.dateTo}` })
+    if (filters.dateFrom) chips.push({ key: 'dateFrom', label: `من: ${formatDateDMY(filters.dateFrom)}` })
+    if (filters.dateTo) chips.push({ key: 'dateTo', label: `إلى: ${formatDateDMY(filters.dateTo)}` })
     if (filters.search) chips.push({ key: 'search', label: `بحث: ${filters.search}` })
     return chips
   }, [filters])
@@ -479,7 +459,7 @@ export default function AdminInvoicesPage() {
                       key={`${invoice.invoice_number}-${invoice.branch_name}-${invoice.seller_name}`}
                       invoice={invoice}
                       formatCurrency={formatCurrency}
-                      formatDate={formatDate}
+                      formatDate={formatDateDMY}
                       variant="table"
                     />
                   ))}
@@ -493,7 +473,7 @@ export default function AdminInvoicesPage() {
                   key={`${invoice.invoice_number}-${invoice.branch_name}-${invoice.seller_name}`}
                   invoice={invoice}
                   formatCurrency={formatCurrency}
-                  formatDate={formatDate}
+                  formatDate={formatDateDMY}
                   variant="card"
                 />
               ))}

@@ -26,7 +26,7 @@ import {
   SAVED_INVENTORY_SORT_OPTIONS,
   type SavedInventoryFilterState,
 } from '../../lib/savedInventoryFilters'
-import { formatDate, getAccuracyColorClass } from '../../lib/utils'
+import { formatDateDMY, getAccuracyColorClass } from '../../lib/utils'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import {
@@ -380,7 +380,7 @@ function MobileInventoryCard({
           </p>
           <p className="mt-1 flex items-center gap-1 text-xs text-gray-500">
             <Calendar className="h-3 w-3 shrink-0" />
-            {formatDate(inv.created_at)}
+            {formatDateDMY(inv.created_at)}
           </p>
         </div>
         <span
@@ -445,7 +445,7 @@ function TabletInventoryRow({
       )}
     >
       <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
-        {formatDate(inv.created_at)}
+        {formatDateDMY(inv.created_at)}
       </td>
       <td className="max-w-[10rem] truncate px-4 py-3 text-sm font-medium text-gray-900">
         {inv.name || 'بدون اسم'}
@@ -495,7 +495,7 @@ function DesktopInventoryRow({
       )}
     >
       <td className="whitespace-nowrap px-5 py-3.5 text-sm text-gray-600">
-        {formatDate(inv.created_at)}
+        {formatDateDMY(inv.created_at)}
       </td>
       <td className="px-5 py-3.5 text-sm font-medium text-gray-900">{inv.name || 'بدون اسم'}</td>
       <td className="whitespace-nowrap px-5 py-3.5 text-sm text-gray-700">

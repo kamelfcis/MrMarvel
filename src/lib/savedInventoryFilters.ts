@@ -1,6 +1,7 @@
 import type { InventoryCount, InventoryGroup } from './supabase'
 import { BRANCHES } from './constants'
 import { findGroupName } from './inventoryGroups'
+import { formatDateDMY } from './utils'
 
 export type SavedInventorySort = 'newest' | 'oldest' | 'name' | 'branch'
 
@@ -137,10 +138,10 @@ export function getSavedInventoryFilterChips(
     chips.push({ key: 'creatorId', label: `المنشئ: ${creatorName ?? 'محدد'}` })
   }
   if (filters.dateFrom) {
-    chips.push({ key: 'dateFrom', label: `من: ${filters.dateFrom}` })
+    chips.push({ key: 'dateFrom', label: `من: ${formatDateDMY(filters.dateFrom)}` })
   }
   if (filters.dateTo) {
-    chips.push({ key: 'dateTo', label: `إلى: ${filters.dateTo}` })
+    chips.push({ key: 'dateTo', label: `إلى: ${formatDateDMY(filters.dateTo)}` })
   }
   if (filters.sortBy !== DEFAULT_SAVED_INVENTORY_FILTERS.sortBy) {
     const sortLabel =
