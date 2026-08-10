@@ -35,7 +35,7 @@ import {
 import { cn } from '../components/ui/utils'
 import { useSalesImport } from '../hooks/useSalesImport'
 import { supabase, type InvoiceSummary } from '../lib/supabase'
-import { formatDateDMY } from '../lib/utils'
+import { formatDateMDY } from '../lib/utils'
 
 type InvoiceFilters = {
   branch: string
@@ -267,8 +267,8 @@ export default function AdminInvoicesPage() {
     const chips: Array<{ key: keyof InvoiceFilters; label: string }> = []
     if (filters.branch) chips.push({ key: 'branch', label: `الفرع: ${filters.branch}` })
     if (filters.seller) chips.push({ key: 'seller', label: `البائع: ${filters.seller}` })
-    if (filters.dateFrom) chips.push({ key: 'dateFrom', label: `من: ${formatDateDMY(filters.dateFrom)}` })
-    if (filters.dateTo) chips.push({ key: 'dateTo', label: `إلى: ${formatDateDMY(filters.dateTo)}` })
+    if (filters.dateFrom) chips.push({ key: 'dateFrom', label: `من: ${formatDateMDY(filters.dateFrom)}` })
+    if (filters.dateTo) chips.push({ key: 'dateTo', label: `إلى: ${formatDateMDY(filters.dateTo)}` })
     if (filters.search) chips.push({ key: 'search', label: `بحث: ${filters.search}` })
     return chips
   }, [filters])
@@ -459,7 +459,7 @@ export default function AdminInvoicesPage() {
                       key={`${invoice.invoice_number}-${invoice.branch_name}-${invoice.seller_name}`}
                       invoice={invoice}
                       formatCurrency={formatCurrency}
-                      formatDate={formatDateDMY}
+                      formatDate={formatDateMDY}
                       variant="table"
                     />
                   ))}
@@ -473,7 +473,7 @@ export default function AdminInvoicesPage() {
                   key={`${invoice.invoice_number}-${invoice.branch_name}-${invoice.seller_name}`}
                   invoice={invoice}
                   formatCurrency={formatCurrency}
-                  formatDate={formatDateDMY}
+                  formatDate={formatDateMDY}
                   variant="card"
                 />
               ))}

@@ -5,6 +5,43 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/** Eastern Arabic numerals for date display (ar-EG). */
+function toArEgDigits(value: string): string {
+  return value.replace(/\d/g, (digit) => Number(digit).toLocaleString('ar-EG'))
+}
+
+/** Format YYYY-MM-DD (or Date / ISO strings) as mm/dd/yyyy in ar-EG numerals (US date order). */
+export function formatDateMDY(value: string | Date | null | undefined): string {
+  if (value == null || value === '') return '—'
+  try {
+    let y: number
+    let m: number
+    let d: number
+    if (value instanceof Date) {
+      y = value.getFullYear()
+      m = value.getMonth() + 1
+      d = value.getDate()
+    } else {
+      const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
+      if (iso) {
+        y = Number(iso[1])
+        m = Number(iso[2])
+        d = Number(iso[3])
+      } else {
+        const date = new Date(value)
+        if (Number.isNaN(date.getTime())) return String(value)
+        y = date.getFullYear()
+        m = date.getMonth() + 1
+        d = date.getDate()
+      }
+    }
+    const en = `${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')}/${y}`
+    return toArEgDigits(en)
+  } catch {
+    return String(value)
+  }
+}
+
 /** Format YYYY-MM-DD (or Date / ISO strings) as dd/mm/yyyy in ar-EG (day/month/year). */
 export function formatDateDMY(value: string | Date | null | undefined): string {
   if (value == null || value === '') return '—'
