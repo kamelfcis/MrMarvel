@@ -92,6 +92,8 @@ export interface InvoiceLineItemSummary {
   qty?: number | null
   unit_price?: number | null
   net_amount?: number | null
+  returned_qty?: number | null
+  returns_amount?: number | null
 }
 
 export interface InvoiceSummary {
