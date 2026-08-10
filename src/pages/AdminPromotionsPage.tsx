@@ -24,6 +24,7 @@ import {
 } from '../components/ui/dialog'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
+import { SearchableSelect } from '../components/ui/searchable-select'
 import {
   Select,
   SelectContent,
@@ -33,6 +34,10 @@ import {
 } from '../components/ui/select'
 import { useAuth } from '../contexts/AuthContext'
 import { type PromoType, type Promotion } from '../lib/discountAudit'
+import {
+  fetchDistinctItemCategories,
+  fetchDistinctItemNames,
+} from '../lib/salesCatalog'
 import { supabase } from '../lib/supabase'
 import { formatDateMDY } from '../lib/utils'
 import { cn } from '../components/ui/utils'
@@ -100,6 +105,9 @@ export default function AdminPromotionsPage() {
   const [editing, setEditing] = useState<Promotion | null>(null)
   const [form, setForm] = useState<PromoForm>(emptyForm)
   const [submitting, setSubmitting] = useState(false)
+  const [itemNameOptions, setItemNameOptions] = useState<string[]>([])
+  const [itemCategoryOptions, setItemCategoryOptions] = useState<string[]>([])
+  const [catalogLoading, setCatalogLoading] = useState(true)
 
   const fetchPromos = useCallback(async () => {
     setLoading(true)
@@ -118,9 +126,48 @@ export default function AdminPromotionsPage() {
     setLoading(false)
   }, [])
 
+  const fetchCatalog = useCallback(async () => {
+    setCatalogLoading(true)
+    try {
+      const [names, categories] = await Promise.all([
+        fetchDistinctItemNames(),
+        fetchDistinctItemCategories(),
+      ])
+      setItemNameOptions(names)
+      setItemCategoryOptions(categories)
+    } catch (error) {
+      console.error(error)
+      toast.error('فشل تحميل أصناف المبيعات')
+      setItemNameOptions([])
+      setItemCategoryOptions([])
+    } finally {
+      setCatalogLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     void fetchPromos()
-  }, [fetchPromos])
+    void fetchCatalog()
+  }, [fetchPromos, fetchCatalog])
+
+  const itemNameSelectOptions = useMemo(() => {
+    const current = form.item_name.trim()
+    if (current && !itemNameOptions.includes(current)) {
+      return [current, ...itemNameOptions]
+    }
+    return itemNameOptions
+  }, [form.item_name, itemNameOptions])
+
+  const itemCategorySelectOptions = useMemo(() => {
+    const current = form.item_category.trim()
+    if (current && !itemCategoryOptions.includes(current)) {
+      return [current, ...itemCategoryOptions]
+    }
+    return itemCategoryOptions
+  }, [form.item_category, itemCategoryOptions])
+
+  const catalogEmptyMessage =
+    'لا توجد أصناف مستوردة — ارفع ملف فواتير أولاً'
 
   const filtered = useMemo(() => {
     const term = searchTerm.trim().toLowerCase()
@@ -557,19 +604,45 @@ export default function AdminPromotionsPage() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="item-name">اسم الصنف</Label>
-                <Input
-                  id="item-name"
-                  value={form.item_name}
-                  onChange={(e) => setForm((f) => ({ ...f, item_name: e.target.value }))}
-                />
+                {catalogLoading ? (
+                  <div className="h-10 animate-pulse rounded-lg border border-gray-200 bg-gray-100 motion-reduce:animate-none" />
+                ) : (
+                  <SearchableSelect
+                    id="item-name"
+                    value={form.item_name}
+                    onValueChange={(v) => setForm((f) => ({ ...f, item_name: v }))}
+                    options={itemNameSelectOptions}
+                    placeholder="اختر اسم الصنف"
+                    searchPlaceholder="ابحث عن اسم الصنف..."
+                    emptyMessage={
+                      itemNameOptions.length === 0
+                        ? catalogEmptyMessage
+                        : 'لا توجد نتائج'
+                    }
+                    allowClear
+                  />
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="item-cat">مجموعة الصنف</Label>
-                <Input
-                  id="item-cat"
-                  value={form.item_category}
-                  onChange={(e) => setForm((f) => ({ ...f, item_category: e.target.value }))}
-                />
+                {catalogLoading ? (
+                  <div className="h-10 animate-pulse rounded-lg border border-gray-200 bg-gray-100 motion-reduce:animate-none" />
+                ) : (
+                  <SearchableSelect
+                    id="item-cat"
+                    value={form.item_category}
+                    onValueChange={(v) => setForm((f) => ({ ...f, item_category: v }))}
+                    options={itemCategorySelectOptions}
+                    placeholder="اختر مجموعة الصنف"
+                    searchPlaceholder="ابحث عن مجموعة الصنف..."
+                    emptyMessage={
+                      itemCategoryOptions.length === 0
+                        ? catalogEmptyMessage
+                        : 'لا توجد نتائج'
+                    }
+                    allowClear
+                  />
+                )}
               </div>
             </div>
 
