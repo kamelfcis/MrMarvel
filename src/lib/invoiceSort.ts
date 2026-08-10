@@ -4,6 +4,7 @@ export type InvoiceSortField =
   | 'invoice_number'
   | 'branch_name'
   | 'seller_name'
+  | 'customer_mobile'
   | 'invoice_date'
   | 'line_items_count'
   | 'total_net_sales'
@@ -18,6 +19,7 @@ export const INVOICE_SORT_OPTIONS: { value: InvoiceSortField; label: string }[] 
   { value: 'invoice_number', label: 'رقم الفاتورة' },
   { value: 'branch_name', label: 'الفرع' },
   { value: 'seller_name', label: 'البائع' },
+  { value: 'customer_mobile', label: 'رقم الموبيل' },
   { value: 'invoice_date', label: 'التاريخ' },
   { value: 'line_items_count', label: 'البنود' },
   { value: 'total_net_sales', label: 'صافي المبيعات' },
@@ -49,6 +51,9 @@ export function compareInvoices(
       break
     case 'seller_name':
       comparison = compareStrings(a.seller_name, b.seller_name)
+      break
+    case 'customer_mobile':
+      comparison = compareStrings(a.customer_mobile, b.customer_mobile)
       break
     case 'invoice_date':
       comparison = compareStrings(a.invoice_date, b.invoice_date)

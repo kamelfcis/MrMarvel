@@ -205,6 +205,9 @@ export function InvoiceRow({ invoice, formatCurrency, formatDate, variant }: Inv
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
                 <span>الفرع: {invoice.branch_name ?? '—'}</span>
                 <span>البائع: {invoice.seller_name ?? '—'}</span>
+                <span dir="ltr" className="text-right">
+                  الموبيل: {invoice.customer_mobile ?? '—'}
+                </span>
                 <span>التاريخ: {formatDate(invoice.invoice_date)}</span>
                 <span className="text-green-700">
                   صافي: {formatCurrency(invoice.total_net_sales)}
@@ -251,6 +254,9 @@ export function InvoiceRow({ invoice, formatCurrency, formatDate, variant }: Inv
         </td>
         <td className="px-5 py-3 text-gray-600">{invoice.branch_name ?? '—'}</td>
         <td className="px-5 py-3 text-gray-600">{invoice.seller_name ?? '—'}</td>
+        <td className="px-5 py-3 text-gray-600" dir="ltr">
+          {invoice.customer_mobile ?? '—'}
+        </td>
         <td className="px-5 py-3 text-gray-600">{formatDate(invoice.invoice_date)}</td>
         <td className="px-5 py-3">{invoice.line_items_count?.toLocaleString('ar-EG') ?? '—'}</td>
         <td className="px-5 py-3 font-medium text-green-700">
@@ -259,7 +265,7 @@ export function InvoiceRow({ invoice, formatCurrency, formatDate, variant }: Inv
         <td className="px-5 py-3 text-red-600">{formatCurrency(invoice.total_returns)}</td>
       </tr>
       <tr className={cn(open && 'border-x border-b border-blue-200/80')}>
-        <td colSpan={7} className="p-0">
+        <td colSpan={8} className="p-0">
           <Collapsible open={open} onOpenChange={setOpen}>
             <CollapsibleContent className={contentClass}>
               <div className="border-t border-blue-100/80 bg-gradient-to-b from-slate-50/80 to-white px-5 pb-4 pt-3">

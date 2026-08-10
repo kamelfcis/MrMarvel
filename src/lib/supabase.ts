@@ -86,6 +86,7 @@ export interface InvoiceSummary {
   invoice_number: string
   branch_name: string | null
   seller_name: string | null
+  customer_mobile: string | null
   invoice_date: string | null
   line_items_count: number
   total_qty: number | null
