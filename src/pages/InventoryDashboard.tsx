@@ -21,7 +21,9 @@ import {
   History,
   LogOut,
   Menu,
+  Percent,
   Save,
+  ScanSearch,
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -530,6 +532,20 @@ export default function InventoryDashboard() {
               >
                 <BarChart3 className="h-4 w-4" />
                 احصائيات الفواتير
+              </Link>
+              <Link
+                to="/admin/promotions"
+                className="flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm transition hover:bg-blue-600"
+              >
+                <Percent className="h-4 w-4" />
+                إدارة العروض
+              </Link>
+              <Link
+                to="/admin/discount-audit"
+                className="flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm transition hover:bg-blue-600"
+              >
+                <ScanSearch className="h-4 w-4" />
+                مراجعة الخصومات
               </Link>
             </>
           )}

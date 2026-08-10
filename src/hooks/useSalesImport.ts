@@ -12,6 +12,7 @@ import {
   type SalesDetailInsert,
   type SalesImportSummary,
 } from '../lib/salesImport'
+import { scanDiscountFlagsForInvoices } from '../lib/discountAudit'
 import { supabase } from '../lib/supabase'
 import * as XLSX from 'xlsx'
 
@@ -147,6 +148,27 @@ export function useSalesImport(onSuccess?: () => void) {
           warnings,
         }
         setLastSummary(summary)
+
+        setProgress({
+          phase: 'inserting',
+          percent: 96,
+          message: 'جاري فحص خصومات الكاشير...',
+        })
+        try {
+          const invoiceNumbers = [
+            ...new Set(toInsert.map((r) => r.invoice_number).filter(Boolean) as string[]),
+          ]
+          const scan = await scanDiscountFlagsForInvoices(invoiceNumbers)
+          if (scan.flagged > 0) {
+            toast.warning(
+              `تنبيه خصم: ${scan.flagged.toLocaleString('ar-EG')} سطر مشبوه بعد الاستيراد`,
+            )
+          }
+        } catch (scanErr) {
+          console.error(scanErr)
+          toast.warning('تم الاستيراد لكن فشل فحص الخصومات — يمكن إعادة الفحص لاحقاً')
+        }
+
         const headline = formatSalesImportHeadline(summary)
         setProgress({ phase: 'done', percent: 100, message: headline })
         const toastResult = formatSalesImportToast(summary)

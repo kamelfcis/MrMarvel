@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   AlertCircle,
   ArrowDownAZ,
@@ -206,6 +207,7 @@ function StatsCards({
 }
 
 export default function AdminInvoicesPage() {
+  const [searchParams] = useSearchParams()
   const [allInvoices, setAllInvoices] = useState<InvoiceSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -213,11 +215,19 @@ export default function AdminInvoicesPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [branches, setBranches] = useState<string[]>([])
   const [sellers, setSellers] = useState<string[]>([])
+  const [suspiciousInvoices, setSuspiciousInvoices] = useState<Set<string>>(new Set())
   const [uploadOpen, setUploadOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState<PageSize>(25)
   const [sortField, setSortField] = useState<InvoiceSortField>(DEFAULT_INVOICE_SORT_FIELD)
   const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_INVOICE_SORT_DIRECTION)
+
+  useEffect(() => {
+    const invoiceParam = searchParams.get('invoice')
+    if (invoiceParam) {
+      setFilters((prev) => ({ ...prev, search: invoiceParam }))
+    }
+  }, [searchParams])
 
   const fetchFilterOptions = useCallback(async () => {
     const [branchRes, sellerRes] = await Promise.all([
@@ -229,6 +239,22 @@ export default function AdminInvoicesPage() {
     )
     setSellers(
       [...new Set((sellerRes.data ?? []).map((r) => r.seller_name).filter(Boolean))] as string[],
+    )
+  }, [])
+
+  const fetchSuspiciousInvoices = useCallback(async () => {
+    const { data, error: flagError } = await supabase
+      .from('discount_flags')
+      .select('invoice_number')
+      .eq('reviewed', false)
+
+    if (flagError) {
+      console.error(flagError)
+      setSuspiciousInvoices(new Set())
+      return
+    }
+    setSuspiciousInvoices(
+      new Set((data ?? []).map((r) => r.invoice_number).filter(Boolean) as string[]),
     )
   }, [])
 
@@ -264,11 +290,13 @@ export default function AdminInvoicesPage() {
   const { uploading, progress, lastSummary, uploadFile, resetProgress } = useSalesImport(() => {
     void fetchInvoices()
     void fetchFilterOptions()
+    void fetchSuspiciousInvoices()
   })
 
   useEffect(() => {
     void fetchFilterOptions()
-  }, [fetchFilterOptions])
+    void fetchSuspiciousInvoices()
+  }, [fetchFilterOptions, fetchSuspiciousInvoices])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -531,6 +559,7 @@ export default function AdminInvoicesPage() {
                       formatCurrency={formatCurrency}
                       formatDate={formatDateMDY}
                       variant="table"
+                      suspiciousDiscount={suspiciousInvoices.has(invoice.invoice_number)}
                     />
                   ))}
                 </tbody>
@@ -585,6 +614,7 @@ export default function AdminInvoicesPage() {
                   formatCurrency={formatCurrency}
                   formatDate={formatDateMDY}
                   variant="card"
+                  suspiciousDiscount={suspiciousInvoices.has(invoice.invoice_number)}
                 />
               ))}
             </div>

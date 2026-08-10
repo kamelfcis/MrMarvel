@@ -16,6 +16,8 @@ type InvoiceRowProps = {
   formatCurrency: (value: number | null | undefined) => string
   formatDate: (value: string | null | undefined) => string
   variant: 'table' | 'card'
+  /** Unreviewed discount_flags exist for this invoice */
+  suspiciousDiscount?: boolean
 }
 
 function LineItemsTable({
@@ -192,9 +194,24 @@ function CustomerMobileCell({
   )
 }
 
-export function InvoiceRow({ invoice, formatCurrency, formatDate, variant }: InvoiceRowProps) {
+export function InvoiceRow({
+  invoice,
+  formatCurrency,
+  formatDate,
+  variant,
+  suspiciousDiscount = false,
+}: InvoiceRowProps) {
   const [open, setOpen] = useState(false)
   const hasReturn = invoiceHasReturn(invoice)
+
+  const suspiciousBadge = suspiciousDiscount ? (
+    <Badge
+      variant="destructive"
+      className={hasReturn ? 'bg-amber-400 text-amber-950' : undefined}
+    >
+      خصم مشبوه
+    </Badge>
+  ) : null
   const { lineItems, loadingItems, itemsError, fetchLineItems } = useInvoiceLineItems(
     invoice.invoice_number,
     open,
@@ -269,6 +286,7 @@ export function InvoiceRow({ invoice, formatCurrency, formatDate, variant }: Inv
                 >
                   {invoice.line_items_count?.toLocaleString('ar-EG')} بند
                 </Badge>
+                {suspiciousBadge}
               </div>
               <div
                 className={cn(
@@ -350,6 +368,7 @@ export function InvoiceRow({ invoice, formatCurrency, formatDate, variant }: Inv
             <span className={cn('font-medium', hasReturn ? 'text-white' : 'text-gray-900')}>
               {invoice.invoice_number}
             </span>
+            {suspiciousBadge}
           </button>
         </td>
         <td className={cn('px-5 py-3', hasReturn ? 'text-white/90' : 'text-gray-600')}>

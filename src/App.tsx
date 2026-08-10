@@ -11,6 +11,8 @@ import AdminUsersPage from './pages/AdminUsersPage'
 import AdminInventoryGroupsPage from './pages/AdminInventoryGroupsPage'
 import AdminInvoicesPage from './pages/AdminInvoicesPage'
 import AdminInvoiceStatsPage from './pages/AdminInvoiceStatsPage'
+import AdminPromotionsPage from './pages/AdminPromotionsPage'
+import AdminDiscountAuditPage from './pages/AdminDiscountAuditPage'
 
 function RootRedirect() {
   const { session, loading } = useAuth()
@@ -34,6 +36,8 @@ export default function App() {
                 <Route path="/admin/inventory-groups" element={<AdminInventoryGroupsPage />} />
                 <Route path="/admin/invoices" element={<AdminInvoicesPage />} />
                 <Route path="/admin/invoice-stats" element={<AdminInvoiceStatsPage />} />
+                <Route path="/admin/promotions" element={<AdminPromotionsPage />} />
+                <Route path="/admin/discount-audit" element={<AdminDiscountAuditPage />} />
               </Route>
             </Route>
           </Route>
