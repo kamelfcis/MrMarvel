@@ -205,7 +205,7 @@ export function InvoiceRow({ invoice, formatCurrency, formatDate, variant }: Inv
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
                 <span>الفرع: {invoice.branch_name ?? '—'}</span>
                 <span>البائع: {invoice.seller_name ?? '—'}</span>
-                <span dir="ltr" className="text-right">
+                <span dir="ltr" className="text-center">
                   الموبيل: {invoice.customer_mobile ?? '—'}
                 </span>
                 <span>التاريخ: {formatDate(invoice.invoice_date)}</span>
@@ -254,7 +254,7 @@ export function InvoiceRow({ invoice, formatCurrency, formatDate, variant }: Inv
         </td>
         <td className="px-5 py-3 text-gray-600">{invoice.branch_name ?? '—'}</td>
         <td className="px-5 py-3 text-gray-600">{invoice.seller_name ?? '—'}</td>
-        <td className="px-5 py-3 text-gray-600" dir="ltr">
+        <td className="px-5 py-3 text-center align-middle text-gray-600" dir="ltr">
           {invoice.customer_mobile ?? '—'}
         </td>
         <td className="px-5 py-3 text-gray-600">{formatDate(invoice.invoice_date)}</td>

@@ -95,22 +95,26 @@ function SortableHeader({
   sortField,
   sortDirection,
   onSort,
+  className,
 }: {
   field: InvoiceSortField
   label: string
   sortField: InvoiceSortField
   sortDirection: SortDirection
   onSort: (field: InvoiceSortField) => void
+  className?: string
 }) {
   const active = sortField === field
+  const centered = className?.includes('text-center')
 
   return (
-    <th className="px-5 py-3 font-medium">
+    <th className={cn('px-5 py-3 font-medium align-middle', className)}>
       <button
         type="button"
         onClick={() => onSort(field)}
         className={cn(
           'inline-flex items-center gap-1.5 rounded-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+          centered && 'w-full justify-center',
           active ? 'text-blue-700' : 'text-gray-500 hover:text-gray-800',
         )}
         aria-sort={
@@ -202,7 +206,7 @@ function StatsCards({
 }
 
 export default function AdminInvoicesPage() {
-  const [invoices, setInvoices] = useState<InvoiceSummary[]>([])
+  const [allInvoices, setAllInvoices] = useState<InvoiceSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<InvoiceFilters>(emptyFilters)
@@ -247,21 +251,15 @@ export default function AdminInvoicesPage() {
 
       if (queryError) throw queryError
 
-      let rows = (data as InvoiceSummary[]) ?? []
-
-      if (debouncedSearch.trim()) {
-        rows = filterInvoicesBySearch(rows, debouncedSearch)
-      }
-
-      setInvoices(rows)
+      setAllInvoices((data as InvoiceSummary[]) ?? [])
     } catch (err) {
       console.error(err)
       setError('فشل تحميل بيانات الفواتير')
-      setInvoices([])
+      setAllInvoices([])
     } finally {
       setLoading(false)
     }
-  }, [filters, debouncedSearch])
+  }, [filters.branch, filters.seller, filters.dateFrom, filters.dateTo])
 
   const { uploading, progress, lastSummary, uploadFile, resetProgress } = useSalesImport(() => {
     void fetchInvoices()
@@ -287,18 +285,25 @@ export default function AdminInvoicesPage() {
     setCurrentPage(1)
   }, [filters, debouncedSearch, pageSize, sortField, sortDirection])
 
+  const filteredInvoices = useMemo(
+    () => filterInvoicesBySearch(allInvoices, debouncedSearch),
+    [allInvoices, debouncedSearch],
+  )
+
+  const isSearching = debouncedSearch.trim().length > 0
+
   const sortedInvoices = useMemo(
-    () => sortInvoices(invoices, sortField, sortDirection),
-    [invoices, sortField, sortDirection],
+    () => sortInvoices(filteredInvoices, sortField, sortDirection),
+    [filteredInvoices, sortField, sortDirection],
   )
 
   const stats = useMemo(() => {
-    const totalInvoices = invoices.length
-    const totalNetSales = invoices.reduce((s, i) => s + (i.total_net_sales ?? 0), 0)
-    const totalReturns = invoices.reduce((s, i) => s + (i.total_returns ?? 0), 0)
+    const totalInvoices = filteredInvoices.length
+    const totalNetSales = filteredInvoices.reduce((s, i) => s + (i.total_net_sales ?? 0), 0)
+    const totalReturns = filteredInvoices.reduce((s, i) => s + (i.total_returns ?? 0), 0)
     const avgInvoice = totalInvoices > 0 ? totalNetSales / totalInvoices : 0
     return { totalInvoices, totalNetSales, totalReturns, avgInvoice }
-  }, [invoices])
+  }, [filteredInvoices])
 
   const totalPages = Math.max(1, Math.ceil(sortedInvoices.length / pageSize))
   const safePage = Math.min(currentPage, totalPages)
@@ -332,7 +337,8 @@ export default function AdminInvoicesPage() {
     setFilters((prev) => ({ ...prev, [key]: '' }))
   }
 
-  const hasAnyData = !loading && !error && invoices.length === 0 && activeFilters.length === 0
+  const hasAnyData =
+    !loading && !error && allInvoices.length === 0 && activeFilters.length === 0
 
   return (
     <div className="space-y-6">
@@ -437,7 +443,7 @@ export default function AdminInvoicesPage() {
             </div>
           </div>
 
-          {activeFilters.length > 0 && (
+          {(activeFilters.length > 0 || isSearching) && (
             <div className="mt-4 flex flex-wrap items-center gap-2">
               {activeFilters.map(({ key, label }) => (
                 <Badge key={key} variant="info" className="gap-1 pr-1">
@@ -452,9 +458,16 @@ export default function AdminInvoicesPage() {
                   </button>
                 </Badge>
               ))}
-              <Button variant="outline" size="sm" onClick={clearFilters}>
-                مسح الكل
-              </Button>
+              {isSearching && !loading && (
+                <span className="text-sm text-gray-600">
+                  {filteredInvoices.length.toLocaleString('ar-EG')} نتيجة
+                </span>
+              )}
+              {activeFilters.length > 0 && (
+                <Button variant="outline" size="sm" onClick={clearFilters}>
+                  مسح الكل
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -505,6 +518,7 @@ export default function AdminInvoicesPage() {
                         sortField={sortField}
                         sortDirection={sortDirection}
                         onSort={handleSort}
+                        className={value === 'customer_mobile' ? 'text-center' : undefined}
                       />
                     ))}
                   </tr>
