@@ -18,6 +18,8 @@ select
     'item_category', item_category,
     'color', color,
     'size', size,
+    'supplier_name', supplier_name,
+    'season_name', season_name,
     'qty', sold_qty,
     'unit_price', unit_price,
     'net_amount', net_sales_amount

@@ -38,6 +38,7 @@ import {
 } from '../components/ui/select'
 import { cn } from '../components/ui/utils'
 import { useSalesImport } from '../hooks/useSalesImport'
+import { filterInvoicesBySearch } from '../lib/invoiceSearch'
 import {
   DEFAULT_INVOICE_SORT_DIRECTION,
   DEFAULT_INVOICE_SORT_FIELD,
@@ -249,26 +250,7 @@ export default function AdminInvoicesPage() {
       let rows = (data as InvoiceSummary[]) ?? []
 
       if (debouncedSearch.trim()) {
-        const term = debouncedSearch.trim()
-        const [byInvoice, byItem] = await Promise.all([
-          supabase
-            .from('sales_details')
-            .select('invoice_number')
-            .ilike('invoice_number', `%${term}%`),
-          supabase
-            .from('sales_details')
-            .select('invoice_number')
-            .ilike('item_name', `%${term}%`),
-        ])
-
-        if (byInvoice.error) throw byInvoice.error
-        if (byItem.error) throw byItem.error
-
-        const matchSet = new Set([
-          ...(byInvoice.data ?? []).map((r) => r.invoice_number),
-          ...(byItem.data ?? []).map((r) => r.invoice_number),
-        ])
-        rows = rows.filter((r) => matchSet.has(r.invoice_number))
+        rows = filterInvoicesBySearch(rows, debouncedSearch)
       }
 
       setInvoices(rows)
@@ -446,7 +428,7 @@ export default function AdminInvoicesPage() {
                 <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <Input
                   id="invoice-search"
-                  placeholder="رقم الفاتورة أو اسم الصنف..."
+                  placeholder="بحث في جميع الأعمدة..."
                   value={filters.search}
                   onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))}
                   className="pr-10"

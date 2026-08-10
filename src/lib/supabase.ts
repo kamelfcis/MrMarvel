@@ -82,6 +82,18 @@ export interface CurrentInventoryResults {
   results: InventoryResultItem[]
 }
 
+export interface InvoiceLineItemSummary {
+  item_name?: string | null
+  item_category?: string | null
+  color?: string | null
+  size?: string | null
+  supplier_name?: string | null
+  season_name?: string | null
+  qty?: number | null
+  unit_price?: number | null
+  net_amount?: number | null
+}
+
 export interface InvoiceSummary {
   invoice_number: string
   branch_name: string | null
@@ -93,6 +105,7 @@ export interface InvoiceSummary {
   total_net_sales: number | null
   total_discount: number | null
   total_returns: number | null
+  line_items?: InvoiceLineItemSummary[] | null
 }
 
 export interface SalesDetailLine {
