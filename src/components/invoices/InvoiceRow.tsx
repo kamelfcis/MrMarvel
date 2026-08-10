@@ -24,7 +24,7 @@ function LineItemsTable({
   formatCurrency: (value: number | null | undefined) => string
 }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-100 bg-gray-50/60">
+    <div className="overflow-x-auto">
       <table className="w-full min-w-[640px] text-xs">
         <thead>
           <tr className="border-b border-gray-200 text-right text-gray-500">
@@ -177,11 +177,23 @@ export function InvoiceRow({ invoice, formatCurrency, formatDate, variant }: Inv
 
   if (variant === 'card') {
     return (
-      <Collapsible open={open} onOpenChange={setOpen} className="rounded-xl border border-gray-200 bg-white shadow-sm">
+      <Collapsible
+        open={open}
+        onOpenChange={setOpen}
+        className={cn(
+          'rounded-xl border bg-white shadow-sm transition-[border-color,box-shadow] duration-200 motion-reduce:transition-none',
+          open
+            ? 'border-blue-200/90 shadow-md ring-1 ring-blue-100/80'
+            : 'border-gray-200',
+        )}
+      >
         <CollapsibleTrigger asChild>
           <button
             type="button"
-            className="flex w-full items-start justify-between gap-3 p-4 text-right transition hover:bg-blue-50/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 active:bg-blue-50/50"
+            className={cn(
+              'flex w-full items-start justify-between gap-3 p-4 text-right transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500',
+              open ? 'bg-blue-50/25 hover:bg-blue-50/35' : 'hover:bg-blue-50/30 active:bg-blue-50/50',
+            )}
           >
             <div className="min-w-0 flex-1 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
@@ -202,8 +214,15 @@ export function InvoiceRow({ invoice, formatCurrency, formatDate, variant }: Inv
             <ChevronDown className={cn(chevronClass, 'mt-1 h-5 w-5')} aria-hidden />
           </button>
         </CollapsibleTrigger>
-        <CollapsibleContent className={cn(contentClass, 'border-t border-gray-100 bg-slate-50/50 px-4 py-3')}>
-          {panel}
+        <CollapsibleContent
+          className={cn(
+            contentClass,
+            'border-t border-blue-100/80 bg-gradient-to-b from-slate-50/80 to-white px-4 py-3',
+          )}
+        >
+          <div className="overflow-hidden rounded-lg border border-gray-200/90 bg-white/90 shadow-sm">
+            {panel}
+          </div>
         </CollapsibleContent>
       </Collapsible>
     )
@@ -211,7 +230,14 @@ export function InvoiceRow({ invoice, formatCurrency, formatDate, variant }: Inv
 
   return (
     <>
-      <tr className="border-b border-gray-100 transition hover:bg-blue-50/20">
+      <tr
+        className={cn(
+          'border-b transition hover:bg-blue-50/20',
+          open
+            ? 'border-x border-t border-blue-200/80 bg-blue-50/20 shadow-sm'
+            : 'border-gray-100',
+        )}
+      >
         <td className="px-5 py-3">
           <button
             type="button"
@@ -232,11 +258,15 @@ export function InvoiceRow({ invoice, formatCurrency, formatDate, variant }: Inv
         </td>
         <td className="px-5 py-3 text-red-600">{formatCurrency(invoice.total_returns)}</td>
       </tr>
-      <tr>
+      <tr className={cn(open && 'border-x border-b border-blue-200/80')}>
         <td colSpan={7} className="p-0">
           <Collapsible open={open} onOpenChange={setOpen}>
             <CollapsibleContent className={contentClass}>
-              <div className="border-t border-gray-100 bg-slate-50/50 px-5 py-3">{panel}</div>
+              <div className="border-t border-blue-100/80 bg-gradient-to-b from-slate-50/80 to-white px-5 pb-4 pt-3">
+                <div className="overflow-hidden rounded-b-lg border border-gray-200/90 bg-white/90 shadow-sm">
+                  {panel}
+                </div>
+              </div>
             </CollapsibleContent>
           </Collapsible>
         </td>

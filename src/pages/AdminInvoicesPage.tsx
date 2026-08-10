@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle,
+  ArrowDownAZ,
+  ArrowUpAZ,
+  ChevronDown,
+  ChevronUp,
   FileText,
   Filter,
   Receipt,
@@ -34,6 +38,14 @@ import {
 } from '../components/ui/select'
 import { cn } from '../components/ui/utils'
 import { useSalesImport } from '../hooks/useSalesImport'
+import {
+  DEFAULT_INVOICE_SORT_DIRECTION,
+  DEFAULT_INVOICE_SORT_FIELD,
+  INVOICE_SORT_OPTIONS,
+  sortInvoices,
+  type InvoiceSortField,
+  type SortDirection,
+} from '../lib/invoiceSort'
 import { supabase, type InvoiceSummary } from '../lib/supabase'
 import { formatDateMDY } from '../lib/utils'
 
@@ -73,6 +85,49 @@ function TableSkeleton() {
         </div>
       ))}
     </div>
+  )
+}
+
+function SortableHeader({
+  field,
+  label,
+  sortField,
+  sortDirection,
+  onSort,
+}: {
+  field: InvoiceSortField
+  label: string
+  sortField: InvoiceSortField
+  sortDirection: SortDirection
+  onSort: (field: InvoiceSortField) => void
+}) {
+  const active = sortField === field
+
+  return (
+    <th className="px-5 py-3 font-medium">
+      <button
+        type="button"
+        onClick={() => onSort(field)}
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+          active ? 'text-blue-700' : 'text-gray-500 hover:text-gray-800',
+        )}
+        aria-sort={
+          active ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'
+        }
+      >
+        <span>{label}</span>
+        {active ? (
+          sortDirection === 'asc' ? (
+            <ChevronUp className="h-4 w-4 shrink-0" aria-hidden />
+          ) : (
+            <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+          )
+        ) : (
+          <ChevronDown className="h-4 w-4 shrink-0 text-gray-300" aria-hidden />
+        )}
+      </button>
+    </th>
   )
 }
 
@@ -156,6 +211,8 @@ export default function AdminInvoicesPage() {
   const [uploadOpen, setUploadOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState<PageSize>(25)
+  const [sortField, setSortField] = useState<InvoiceSortField>(DEFAULT_INVOICE_SORT_FIELD)
+  const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_INVOICE_SORT_DIRECTION)
 
   const fetchFilterOptions = useCallback(async () => {
     const [branchRes, sellerRes] = await Promise.all([
@@ -246,7 +303,12 @@ export default function AdminInvoicesPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [filters, debouncedSearch, pageSize])
+  }, [filters, debouncedSearch, pageSize, sortField, sortDirection])
+
+  const sortedInvoices = useMemo(
+    () => sortInvoices(invoices, sortField, sortDirection),
+    [invoices, sortField, sortDirection],
+  )
 
   const stats = useMemo(() => {
     const totalInvoices = invoices.length
@@ -256,12 +318,21 @@ export default function AdminInvoicesPage() {
     return { totalInvoices, totalNetSales, totalReturns, avgInvoice }
   }, [invoices])
 
-  const totalPages = Math.max(1, Math.ceil(invoices.length / pageSize))
+  const totalPages = Math.max(1, Math.ceil(sortedInvoices.length / pageSize))
   const safePage = Math.min(currentPage, totalPages)
   const paginatedInvoices = useMemo(() => {
     const start = (safePage - 1) * pageSize
-    return invoices.slice(start, start + pageSize)
-  }, [invoices, safePage, pageSize])
+    return sortedInvoices.slice(start, start + pageSize)
+  }, [sortedInvoices, safePage, pageSize])
+
+  const handleSort = (field: InvoiceSortField) => {
+    if (sortField === field) {
+      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setSortField(field)
+    setSortDirection(field === 'invoice_date' ? 'desc' : 'asc')
+  }
 
   const activeFilters = useMemo(() => {
     const chips: Array<{ key: keyof InvoiceFilters; label: string }> = []
@@ -444,13 +515,16 @@ export default function AdminInvoicesPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50/80 text-right text-gray-500">
-                    <th className="px-5 py-3 font-medium">رقم الفاتورة</th>
-                    <th className="px-5 py-3 font-medium">الفرع</th>
-                    <th className="px-5 py-3 font-medium">البائع</th>
-                    <th className="px-5 py-3 font-medium">التاريخ</th>
-                    <th className="px-5 py-3 font-medium">البنود</th>
-                    <th className="px-5 py-3 font-medium">صافي المبيعات</th>
-                    <th className="px-5 py-3 font-medium">المرتجعات</th>
+                    {INVOICE_SORT_OPTIONS.map(({ value, label }) => (
+                      <SortableHeader
+                        key={value}
+                        field={value}
+                        label={label}
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                      />
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -468,6 +542,46 @@ export default function AdminInvoicesPage() {
             </div>
 
             <div className="space-y-3 p-4 md:hidden">
+              <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white/80 p-3 shadow-sm sm:flex-row sm:items-end">
+                <div className="flex-1 space-y-1.5">
+                  <Label htmlFor="mobile-invoice-sort">ترتيب حسب</Label>
+                  <Select
+                    value={sortField}
+                    onValueChange={(value) => {
+                      const field = value as InvoiceSortField
+                      setSortField(field)
+                      if (field === 'invoice_date') {
+                        setSortDirection('desc')
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="mobile-invoice-sort">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INVOICE_SORT_OPTIONS.map(({ value, label }) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}
+                  className="gap-2 border-blue-200 bg-white sm:mb-0.5"
+                  aria-label={sortDirection === 'asc' ? 'ترتيب تصاعدي' : 'ترتيب تنازلي'}
+                >
+                  {sortDirection === 'asc' ? (
+                    <ArrowDownAZ className="h-4 w-4" />
+                  ) : (
+                    <ArrowUpAZ className="h-4 w-4" />
+                  )}
+                  {sortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}
+                </Button>
+              </div>
               {paginatedInvoices.map((invoice) => (
                 <InvoiceRow
                   key={`${invoice.invoice_number}-${invoice.branch_name}-${invoice.seller_name}`}
@@ -483,7 +597,7 @@ export default function AdminInvoicesPage() {
               currentPage={safePage}
               totalPages={totalPages}
               pageSize={pageSize}
-              totalItems={invoices.length}
+              totalItems={sortedInvoices.length}
               onPageChange={setCurrentPage}
               onPageSizeChange={(size) => {
                 setPageSize(size)
