@@ -197,21 +197,30 @@ export function topCategoriesByQty(rows: SalesDetailStatsRow[], limit = 10): Nam
   return topEntries(map, limit)
 }
 
-/** Default date range: last 30 days ending today (YYYY-MM-DD). */
+function toIsoDate(d: Date) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Normalize any date-like string to YYYY-MM-DD, or null if invalid. */
+export function toYmd(value: string | null | undefined): string | null {
+  if (!value) return null
+  const trimmed = value.trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed
+  const sliced = trimmed.slice(0, 10)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(sliced)) return sliced
+  return null
+}
+
+/** Fallback date range: last 30 days ending today (YYYY-MM-DD). */
 export function defaultDateRange(today = new Date()): { dateFrom: string; dateTo: string } {
   const end = new Date(today)
   end.setHours(0, 0, 0, 0)
   const start = new Date(end)
   start.setDate(start.getDate() - 29)
-
-  const toIso = (d: Date) => {
-    const y = d.getFullYear()
-    const m = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    return `${y}-${m}-${day}`
-  }
-
-  return { dateFrom: toIso(start), dateTo: toIso(end) }
+  return { dateFrom: toIsoDate(start), dateTo: toIsoDate(end) }
 }
 
 /** Plan API aliases */

@@ -33,6 +33,7 @@ import {
   buildDailySales,
   buildInvoiceStatsKpis,
   defaultDateRange,
+  toYmd,
   topBranchesByNetSales,
   topCategoriesByQty,
   topCustomersByInvoices,
@@ -213,27 +214,67 @@ function KpiCards({
   )
 }
 
+async function fetchSalesDateBounds(): Promise<{ dateFrom: string; dateTo: string } | null> {
+  const [minRes, maxRes] = await Promise.all([
+    supabase
+      .from('sales_details')
+      .select('sale_date')
+      .not('sale_date', 'is', null)
+      .order('sale_date', { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('sales_details')
+      .select('sale_date')
+      .not('sale_date', 'is', null)
+      .order('sale_date', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
+
+  if (minRes.error) throw minRes.error
+  if (maxRes.error) throw maxRes.error
+
+  const dateFrom = toYmd(minRes.data?.sale_date)
+  const dateTo = toYmd(maxRes.data?.sale_date)
+  if (!dateFrom || !dateTo) return null
+  return { dateFrom, dateTo }
+}
+
 async function fetchSalesDetailsInRange(
   dateFrom: string,
   dateTo: string,
 ): Promise<SalesDetailStatsRow[]> {
+  const fromYmd = toYmd(dateFrom)
+  const toYmdValue = toYmd(dateTo)
+  if (!fromYmd || !toYmdValue) {
+    throw new Error('Invalid date range')
+  }
+
   const all: SalesDetailStatsRow[] = []
   let from = 0
 
   while (true) {
     const to = from + PAGE_SIZE - 1
-    const { data, error } = await supabase
+    const { data, error, count } = await supabase
       .from('sales_details')
-      .select(SELECT_FIELDS)
-      .gte('sale_date', dateFrom)
-      .lte('sale_date', dateTo)
+      .select(SELECT_FIELDS, { count: from === 0 ? 'exact' : undefined })
+      .gte('sale_date', fromYmd)
+      .lte('sale_date', toYmdValue)
       .order('sale_date', { ascending: true })
+      .order('invoice_number', { ascending: true })
       .range(from, to)
 
     if (error) throw error
 
     const batch = (data as SalesDetailStatsRow[] | null) ?? []
     all.push(...batch)
+
+    // First page: if count says there are rows but batch is empty, something is wrong
+    if (from === 0 && (count ?? 0) > 0 && batch.length === 0) {
+      throw new Error('Pagination returned 0 rows despite non-zero count')
+    }
+
     if (batch.length < PAGE_SIZE) break
     from += PAGE_SIZE
   }
@@ -242,16 +283,49 @@ async function fetchSalesDetailsInRange(
 }
 
 export default function AdminInvoiceStatsPage() {
-  const initialRange = useMemo(() => defaultDateRange(), [])
-  const [dateFrom, setDateFrom] = useState(initialRange.dateFrom)
-  const [dateTo, setDateTo] = useState(initialRange.dateTo)
-  const [appliedFrom, setAppliedFrom] = useState(initialRange.dateFrom)
-  const [appliedTo, setAppliedTo] = useState(initialRange.dateTo)
+  const fallbackRange = useMemo(() => defaultDateRange(), [])
+  const [dateFrom, setDateFrom] = useState(fallbackRange.dateFrom)
+  const [dateTo, setDateTo] = useState(fallbackRange.dateTo)
+  const [appliedFrom, setAppliedFrom] = useState(fallbackRange.dateFrom)
+  const [appliedTo, setAppliedTo] = useState(fallbackRange.dateTo)
+  const [rangeReady, setRangeReady] = useState(false)
   const [rows, setRows] = useState<SalesDetailStatsRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  useEffect(() => {
+    let cancelled = false
+
+    const resolveDefaultRange = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const bounds = await fetchSalesDateBounds()
+        if (cancelled) return
+        const range = bounds ?? fallbackRange
+        setDateFrom(range.dateFrom)
+        setDateTo(range.dateTo)
+        setAppliedFrom(range.dateFrom)
+        setAppliedTo(range.dateTo)
+        setRangeReady(true)
+      } catch (err) {
+        console.error(err)
+        if (cancelled) return
+        // Still allow the page to load with the 30-day fallback
+        setAppliedFrom(fallbackRange.dateFrom)
+        setAppliedTo(fallbackRange.dateTo)
+        setRangeReady(true)
+      }
+    }
+
+    void resolveDefaultRange()
+    return () => {
+      cancelled = true
+    }
+  }, [fallbackRange])
+
   const fetchStats = useCallback(async () => {
+    if (!rangeReady) return
     setLoading(true)
     setError(null)
     try {
@@ -264,15 +338,20 @@ export default function AdminInvoiceStatsPage() {
     } finally {
       setLoading(false)
     }
-  }, [appliedFrom, appliedTo])
+  }, [appliedFrom, appliedTo, rangeReady])
 
   useEffect(() => {
     void fetchStats()
   }, [fetchStats])
 
   const applyFilters = () => {
-    setAppliedFrom(dateFrom)
-    setAppliedTo(dateTo)
+    const from = toYmd(dateFrom)
+    const to = toYmd(dateTo)
+    if (!from || !to) return
+    setDateFrom(from)
+    setDateTo(to)
+    setAppliedFrom(from)
+    setAppliedTo(to)
   }
 
   const kpis = useMemo(() => buildInvoiceStatsKpis(rows), [rows])
