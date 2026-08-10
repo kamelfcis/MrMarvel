@@ -7,6 +7,8 @@ import {
   salesDedupeKey,
   readSalesExcelFile,
   validateSalesColumns,
+  formatSalesImportHeadline,
+  formatSalesImportToast,
   type SalesDetailInsert,
   type SalesImportSummary,
 } from '../lib/salesImport'
@@ -116,9 +118,14 @@ export function useSalesImport(onSuccess?: () => void) {
             warnings,
           }
           setLastSummary(summary)
-          setProgress({ phase: 'done', percent: 100, message: 'لا توجد صفوف جديدة للإضافة' })
-          toast.info('جميع الصفوف موجودة مسبقاً أو غير صالحة')
-          onSuccess?.()
+          const headline = formatSalesImportHeadline(summary)
+          setProgress({ phase: 'done', percent: 100, message: headline })
+          const toastResult = formatSalesImportToast(summary)
+          if (toastResult.variant === 'warning') {
+            toast.warning(toastResult.message)
+          } else {
+            toast.info(toastResult.message)
+          }
           return
         }
 
@@ -140,8 +147,16 @@ export function useSalesImport(onSuccess?: () => void) {
           warnings,
         }
         setLastSummary(summary)
-        setProgress({ phase: 'done', percent: 100, message: 'اكتمل الرفع بنجاح' })
-        toast.success(`تمت إضافة ${added.toLocaleString('ar-EG')} صف`)
+        const headline = formatSalesImportHeadline(summary)
+        setProgress({ phase: 'done', percent: 100, message: headline })
+        const toastResult = formatSalesImportToast(summary)
+        if (toastResult.variant === 'success') {
+          toast.success(toastResult.message)
+        } else if (toastResult.variant === 'warning') {
+          toast.warning(toastResult.message)
+        } else {
+          toast.info(toastResult.message)
+        }
         onSuccess?.()
       } catch (err) {
         console.error(err)

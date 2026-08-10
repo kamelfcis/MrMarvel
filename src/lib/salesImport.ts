@@ -94,6 +94,81 @@ export type SalesImportSummary = {
   warnings: string[]
 }
 
+export function salesImportValidRowCount(summary: SalesImportSummary): number {
+  return summary.added + summary.skippedDuplicate
+}
+
+export function isFullDuplicateImport(summary: SalesImportSummary): boolean {
+  const validRows = salesImportValidRowCount(summary)
+  return summary.added === 0 && summary.skippedDuplicate > 0 && summary.skippedDuplicate === validRows
+}
+
+export function formatSalesImportHeadline(summary: SalesImportSummary): string {
+  const dup = summary.skippedDuplicate.toLocaleString('ar-EG')
+  const added = summary.added.toLocaleString('ar-EG')
+
+  if (isFullDuplicateImport(summary)) {
+    return `تم رفض ${dup} صف مكرر — جميع الصفوف موجودة مسبقاً`
+  }
+
+  if (summary.added > 0 && summary.skippedDuplicate > 0) {
+    return `تمت إضافة ${added} صف، تم رفض ${dup} صف مكرر`
+  }
+
+  if (summary.added > 0) {
+    return `تمت إضافة ${added} صف بنجاح`
+  }
+
+  if (summary.skippedMissingInvoice > 0 && summary.skippedDuplicate === 0) {
+    const invalid = summary.skippedMissingInvoice.toLocaleString('ar-EG')
+    return `لم تُضف أي صف — ${invalid} صف بدون رقم فاتورة`
+  }
+
+  return 'لا توجد صفوف جديدة للإضافة'
+}
+
+export function formatSalesImportToast(summary: SalesImportSummary): {
+  variant: 'success' | 'warning' | 'info'
+  message: string
+} {
+  if (isFullDuplicateImport(summary)) {
+    const dup = summary.skippedDuplicate.toLocaleString('ar-EG')
+    return {
+      variant: 'warning',
+      message: `تم رفض ${dup} صفوف مكرر — جميع الصفوف موجودة مسبقاً`,
+    }
+  }
+
+  if (summary.added > 0 && summary.skippedDuplicate > 0) {
+    const added = summary.added.toLocaleString('ar-EG')
+    const dup = summary.skippedDuplicate.toLocaleString('ar-EG')
+    return {
+      variant: 'success',
+      message: `تمت إضافة ${added} صف، تم رفض ${dup} صف مكرر`,
+    }
+  }
+
+  if (summary.added > 0) {
+    return {
+      variant: 'success',
+      message: `تمت إضافة ${summary.added.toLocaleString('ar-EG')} صف`,
+    }
+  }
+
+  if (summary.skippedDuplicate > 0) {
+    const dup = summary.skippedDuplicate.toLocaleString('ar-EG')
+    return {
+      variant: 'warning',
+      message: `تم رفض ${dup} صف مكرر`,
+    }
+  }
+
+  return {
+    variant: 'info',
+    message: 'لم تُضف أي صفوف جديدة',
+  }
+}
+
 export function toNumber(value: unknown): number | null {
   if (value == null || value === '') return null
   if (typeof value === 'number' && Number.isFinite(value)) return value
