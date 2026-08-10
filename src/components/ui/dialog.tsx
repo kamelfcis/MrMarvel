@@ -23,10 +23,18 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
+function isNestedPopoverLayer(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false
+  return Boolean(
+    target.closest('[data-radix-popper-content-wrapper]') ||
+      target.closest('[data-radix-popover-content]')
+  )
+}
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, onPointerDownOutside, onInteractOutside, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
@@ -35,6 +43,18 @@ const DialogContent = React.forwardRef<
         'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-gray-200 bg-white p-6 shadow-lg duration-200 sm:rounded-xl',
         className
       )}
+      onPointerDownOutside={(event) => {
+        if (isNestedPopoverLayer(event.target)) {
+          event.preventDefault()
+        }
+        onPointerDownOutside?.(event)
+      }}
+      onInteractOutside={(event) => {
+        if (isNestedPopoverLayer(event.target)) {
+          event.preventDefault()
+        }
+        onInteractOutside?.(event)
+      }}
       {...props}
     >
       {children}

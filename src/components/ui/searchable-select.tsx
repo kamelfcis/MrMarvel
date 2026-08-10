@@ -44,7 +44,7 @@ export function SearchableSelect({
   const displayValue = value.trim() ? value : ''
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal>
       <PopoverTrigger asChild>
         <Button
           id={id}
@@ -93,10 +93,12 @@ export function SearchableSelect({
         className="w-[var(--radix-popover-trigger-width)] p-0"
         align="start"
         dir="rtl"
+        onOpenAutoFocus={(event) => event.preventDefault()}
+        onCloseAutoFocus={(event) => event.preventDefault()}
       >
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
-          <CommandList>
+          <CommandList className="max-h-[240px]">
             <CommandEmpty>{emptyMessage}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
@@ -107,6 +109,7 @@ export function SearchableSelect({
                     onValueChange(option === value ? '' : option)
                     setOpen(false)
                   }}
+                  onPointerDown={(event) => event.preventDefault()}
                 >
                   <Check
                     className={cn(

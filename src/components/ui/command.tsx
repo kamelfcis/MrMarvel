@@ -42,7 +42,10 @@ const CommandList = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <CommandPrimitive.List
     ref={ref}
-    className={cn('max-h-60 overflow-y-auto overflow-x-hidden p-1', className)}
+    className={cn(
+      'max-h-60 touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain p-1',
+      className
+    )}
     {...props}
   />
 ))
@@ -66,7 +69,7 @@ const CommandGroup = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <CommandPrimitive.Group
     ref={ref}
-    className={cn('overflow-hidden p-1 text-gray-900', className)}
+    className={cn('p-1 text-gray-900', className)}
     {...props}
   />
 ))
