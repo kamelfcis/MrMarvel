@@ -12,6 +12,7 @@ import {
   type SalesDetailInsert,
   type SalesImportSummary,
 } from '../lib/salesImport'
+import { clearAllSalesData } from '../lib/clearSales'
 import { scanDiscountFlagsForInvoices } from '../lib/discountAudit'
 import { supabase } from '../lib/supabase'
 import * as XLSX from 'xlsx'
@@ -66,6 +67,7 @@ async function insertSalesBatches(
 
 export function useSalesImport(onSuccess?: () => void) {
   const [uploading, setUploading] = useState(false)
+  const [clearing, setClearing] = useState(false)
   const [progress, setProgress] = useState<UploadProgress>(initialProgress)
   const [lastSummary, setLastSummary] = useState<SalesImportSummary | null>(null)
 
@@ -197,11 +199,30 @@ export function useSalesImport(onSuccess?: () => void) {
     setLastSummary(null)
   }, [])
 
+  const clearAllSales = useCallback(async () => {
+    setClearing(true)
+    try {
+      await clearAllSalesData()
+      resetProgress()
+      toast.success('تم مسح كل بيانات جرد الفواتير')
+      onSuccess?.()
+    } catch (err) {
+      console.error(err)
+      const message = err instanceof Error ? err.message : 'فشل مسح البيانات'
+      toast.error(message)
+      throw err
+    } finally {
+      setClearing(false)
+    }
+  }, [onSuccess, resetProgress])
+
   return {
     uploading,
+    clearing,
     progress,
     lastSummary,
     uploadFile,
+    clearAllSales,
     resetProgress,
     expectedHeaders: SALES_EXPECTED_HEADERS,
   }

@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Search,
   TrendingUp,
+  Trash2,
   Upload,
   X,
 } from 'lucide-react'
@@ -25,6 +26,7 @@ import { Card, CardContent } from '../components/ui/card'
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog'
@@ -217,6 +219,7 @@ export default function AdminInvoicesPage() {
   const [sellers, setSellers] = useState<string[]>([])
   const [suspiciousInvoices, setSuspiciousInvoices] = useState<Set<string>>(new Set())
   const [uploadOpen, setUploadOpen] = useState(false)
+  const [clearOpen, setClearOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState<PageSize>(25)
   const [sortField, setSortField] = useState<InvoiceSortField>(DEFAULT_INVOICE_SORT_FIELD)
@@ -287,11 +290,12 @@ export default function AdminInvoicesPage() {
     }
   }, [filters.branch, filters.seller, filters.dateFrom, filters.dateTo])
 
-  const { uploading, progress, lastSummary, uploadFile, resetProgress } = useSalesImport(() => {
-    void fetchInvoices()
-    void fetchFilterOptions()
-    void fetchSuspiciousInvoices()
-  })
+  const { uploading, clearing, progress, lastSummary, uploadFile, clearAllSales, resetProgress } =
+    useSalesImport(() => {
+      void fetchInvoices()
+      void fetchFilterOptions()
+      void fetchSuspiciousInvoices()
+    })
 
   useEffect(() => {
     void fetchFilterOptions()
@@ -368,6 +372,17 @@ export default function AdminInvoicesPage() {
   const hasAnyData =
     !loading && !error && allInvoices.length === 0 && activeFilters.length === 0
 
+  const hasInvoiceData = allInvoices.length > 0
+
+  const handleClearAll = async () => {
+    try {
+      await clearAllSales()
+      setClearOpen(false)
+    } catch {
+      // toast shown in hook
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -377,12 +392,21 @@ export default function AdminInvoicesPage() {
             استعراض فواتير المبيعات ورفع ملفات Excel
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => void fetchInvoices()} disabled={loading}>
             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin motion-reduce:animate-none')} />
             تحديث
           </Button>
-          <Button onClick={() => setUploadOpen(true)}>
+          <Button
+            variant="outline"
+            className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+            disabled={loading || uploading || clearing || !hasInvoiceData}
+            onClick={() => setClearOpen(true)}
+          >
+            <Trash2 className="h-4 w-4" />
+            مسح كل البيانات
+          </Button>
+          <Button onClick={() => setUploadOpen(true)} disabled={uploading || clearing}>
             <Upload className="h-4 w-4" />
             رفع Excel
           </Button>
@@ -649,6 +673,26 @@ export default function AdminInvoicesPage() {
             onUpload={(file) => void uploadFile(file)}
             onReset={resetProgress}
           />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={clearOpen} onOpenChange={setClearOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>مسح كل بيانات جرد الفواتير</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600">
+            سيتم حذف جميع الفواتير المستوردة وعلامات تدقيق الخصم نهائياً. لن يتم حذف العروض
+            الترويجية. يمكنك إعادة رفع ملف Excel بعد المسح.
+          </p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setClearOpen(false)} disabled={clearing}>
+              إلغاء
+            </Button>
+            <Button variant="destructive" disabled={clearing} onClick={() => void handleClearAll()}>
+              {clearing ? 'جاري المسح...' : 'مسح الكل'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
