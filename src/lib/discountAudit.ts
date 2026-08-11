@@ -9,8 +9,13 @@ export const PROMO_ALL_CATEGORIES = 'كل مجموعة الصنف'
 /** Tolerance when comparing applied vs allowed discount (% points). */
 export const DISCOUNT_TOLERANCE_PCT = 0.5
 
-/** Flag lines with discount above this % when no matching promo exists. */
-export const HIGH_DISCOUNT_NO_PROMO_THRESHOLD_PCT = 20
+/** Fallback when DB setting is missing or invalid. */
+export const DEFAULT_HIGH_DISCOUNT_NO_PROMO_THRESHOLD_PCT = 20
+
+export const HIGH_DISCOUNT_NO_PROMO_SETTING_KEY = 'high_discount_no_promo_threshold_pct'
+
+/** @deprecated Use fetchHighDiscountThreshold() or DEFAULT_HIGH_DISCOUNT_NO_PROMO_THRESHOLD_PCT */
+export const HIGH_DISCOUNT_NO_PROMO_THRESHOLD_PCT = DEFAULT_HIGH_DISCOUNT_NO_PROMO_THRESHOLD_PCT
 
 export type PromoType = 'max_percent' | 'buy_x_get_y'
 export type FlagReason =
@@ -203,9 +208,47 @@ function evaluateBuyXGetY(
   }
 }
 
+function parseThresholdValue(value: unknown): number | null {
+  const num = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(num) || num < 0 || num > 100) return null
+  return num
+}
+
+export async function fetchHighDiscountThreshold(): Promise<number> {
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('key', HIGH_DISCOUNT_NO_PROMO_SETTING_KEY)
+    .maybeSingle()
+
+  if (error) throw error
+  const parsed = parseThresholdValue(data?.value)
+  return parsed ?? DEFAULT_HIGH_DISCOUNT_NO_PROMO_THRESHOLD_PCT
+}
+
+export async function saveHighDiscountThreshold(pct: number): Promise<void> {
+  if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
+    throw new Error('يجب أن تكون النسبة بين 0 و 100')
+  }
+
+  const { data: userData } = await supabase.auth.getUser()
+  const { error } = await supabase.from('app_settings').upsert(
+    {
+      key: HIGH_DISCOUNT_NO_PROMO_SETTING_KEY,
+      value: pct,
+      updated_at: new Date().toISOString(),
+      updated_by: userData.user?.id ?? null,
+    },
+    { onConflict: 'key' },
+  )
+
+  if (error) throw error
+}
+
 export function evaluateSalesRows(
   rows: SalesDetailRow[],
   promotions: Promotion[],
+  highDiscountNoPromoThresholdPct: number = DEFAULT_HIGH_DISCOUNT_NO_PROMO_THRESHOLD_PCT,
 ): DiscountFlagInsert[] {
   const flags: DiscountFlagInsert[] = []
   const seenDetailIds = new Set<number>()
@@ -237,7 +280,10 @@ export function evaluateSalesRows(
     }
 
     const hasAnyMatch = matches.length > 0
-    if (!hasAnyMatch && applied > HIGH_DISCOUNT_NO_PROMO_THRESHOLD_PCT + DISCOUNT_TOLERANCE_PCT) {
+    if (
+      !hasAnyMatch &&
+      applied > highDiscountNoPromoThresholdPct + DISCOUNT_TOLERANCE_PCT
+    ) {
       flags.push({
         sales_detail_id: row.id,
         invoice_number: row.invoice_number,
@@ -246,7 +292,7 @@ export function evaluateSalesRows(
         sale_date: row.sale_date,
         item_name: row.item_name,
         applied_discount_pct: applied,
-        allowed_discount_pct: HIGH_DISCOUNT_NO_PROMO_THRESHOLD_PCT,
+        allowed_discount_pct: highDiscountNoPromoThresholdPct,
         flag_reason: 'no_matching_promo_but_high_discount',
         promotion_id: null,
       })
@@ -366,14 +412,15 @@ async function insertFlags(flags: DiscountFlagInsert[]): Promise<number> {
  * rewrite unreviewed discount_flags.
  */
 export async function scanDiscountFlags(range: ScanRange = {}): Promise<ScanResult> {
-  const [promotions, rows] = await Promise.all([
+  const [promotions, rows, threshold] = await Promise.all([
     fetchActivePromotions(),
     fetchSalesDetails(range),
+    fetchHighDiscountThreshold(),
   ])
 
   const salesDetailIds = rows.map((r) => r.id)
   const cleared = await clearUnreviewedFlags(range, salesDetailIds)
-  const flags = evaluateSalesRows(rows, promotions)
+  const flags = evaluateSalesRows(rows, promotions, threshold)
   const flagged = await insertFlags(flags)
 
   return { scanned: rows.length, flagged, cleared }

@@ -25,6 +25,8 @@ import {
   SelectValue,
 } from '../components/ui/select'
 import {
+  DEFAULT_HIGH_DISCOUNT_NO_PROMO_THRESHOLD_PCT,
+  fetchHighDiscountThreshold,
   FLAG_REASON_LABELS,
   scanDiscountFlags,
   type DiscountFlag,
@@ -83,6 +85,9 @@ export default function AdminDiscountAuditPage() {
   const [sellers, setSellers] = useState<string[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState<PageSize>(25)
+  const [noPromoThreshold, setNoPromoThreshold] = useState(
+    DEFAULT_HIGH_DISCOUNT_NO_PROMO_THRESHOLD_PCT,
+  )
 
   const fetchFilterOptions = useCallback(async () => {
     const [branchRes, sellerRes] = await Promise.all([
@@ -131,6 +136,12 @@ export default function AdminDiscountAuditPage() {
   }, [fetchFilterOptions])
 
   useEffect(() => {
+    void fetchHighDiscountThreshold()
+      .then(setNoPromoThreshold)
+      .catch((err) => console.error(err))
+  }, [])
+
+  useEffect(() => {
     void fetchFlags()
   }, [fetchFlags])
 
@@ -158,6 +169,8 @@ export default function AdminDiscountAuditPage() {
         dateFrom: filters.dateFrom || null,
         dateTo: filters.dateTo || null,
       })
+      const threshold = await fetchHighDiscountThreshold()
+      setNoPromoThreshold(threshold)
       toast.success(
         `تم الفحص: ${result.scanned.toLocaleString('ar-EG')} صف — ${result.flagged.toLocaleString('ar-EG')} تنبيه`,
       )
@@ -216,7 +229,8 @@ export default function AdminDiscountAuditPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">مراجعة خصومات الكاشير</h1>
           <p className="mt-1 text-sm text-gray-500">
-            تنبيهات الخصومات التي تتجاوز العروض المعرّفة من المدير
+            تنبيهات الخصومات التي تتجاوز العروض المعرّفة من المدير — الحد المسموح بدون
+            عرض: {noPromoThreshold.toLocaleString('ar-EG')}%
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

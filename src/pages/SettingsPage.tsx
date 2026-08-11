@@ -1,18 +1,52 @@
-import { useState } from 'react'
-import { KeyRound, User } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { KeyRound, Percent, User } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../contexts/AuthContext'
 import { validatePassword } from '../lib/admin'
+import {
+  DEFAULT_HIGH_DISCOUNT_NO_PROMO_THRESHOLD_PCT,
+  fetchHighDiscountThreshold,
+  saveHighDiscountThreshold,
+} from '../lib/discountAudit'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 
 export default function SettingsPage() {
-  const { profile, changePassword } = useAuth()
+  const { profile, changePassword, isSuperAdmin } = useAuth()
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [discountThreshold, setDiscountThreshold] = useState(
+    String(DEFAULT_HIGH_DISCOUNT_NO_PROMO_THRESHOLD_PCT),
+  )
+  const [discountThresholdLoading, setDiscountThresholdLoading] = useState(false)
+  const [discountThresholdSaving, setDiscountThresholdSaving] = useState(false)
+
+  useEffect(() => {
+    if (!isSuperAdmin) return
+
+    let cancelled = false
+    setDiscountThresholdLoading(true)
+    void fetchHighDiscountThreshold()
+      .then((value) => {
+        if (!cancelled) setDiscountThreshold(String(value))
+      })
+      .catch((error) => {
+        console.error(error)
+        if (!cancelled) {
+          toast.error('فشل تحميل إعدادات مراجعة الخصومات')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDiscountThresholdLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [isSuperAdmin])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,6 +67,26 @@ export default function SettingsPage() {
       toast.error(error instanceof Error ? error.message : 'فشل تغيير كلمة المرور')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDiscountThresholdSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    const value = Number(discountThreshold)
+    if (!Number.isFinite(value) || value < 0 || value > 100) {
+      toast.error('يجب أن تكون النسبة بين 0 و 100')
+      return
+    }
+
+    setDiscountThresholdSaving(true)
+    try {
+      await saveHighDiscountThreshold(value)
+      toast.success('تم حفظ حد الخصم بدون عرض. ننصح بإعادة فحص مراجعة الخصومات.')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'فشل حفظ الإعداد')
+    } finally {
+      setDiscountThresholdSaving(false)
     }
   }
 
@@ -63,6 +117,48 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {isSuperAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Percent className="h-5 w-5 text-blue-600" />
+              إعدادات مراجعة الخصومات
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleDiscountThresholdSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="discountThreshold">الحد الأقصى للخصم بدون عرض (%)</Label>
+                <Input
+                  id="discountThreshold"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.1}
+                  required
+                  dir="ltr"
+                  value={discountThreshold}
+                  disabled={discountThresholdLoading}
+                  onChange={(e) => setDiscountThreshold(e.target.value)}
+                  placeholder="20"
+                />
+              </div>
+              <p className="text-xs text-gray-500">
+                يُستخدم عند فحص الفواتير لتحديد «خصم عالي بدون عرض». القيمة الحالية:{' '}
+                {discountThresholdLoading ? '...' : `${discountThreshold}%`}
+              </p>
+              <Button
+                type="submit"
+                disabled={discountThresholdLoading || discountThresholdSaving}
+                className="w-full"
+              >
+                {discountThresholdSaving ? 'جاري الحفظ...' : 'حفظ إعداد الخصم'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
