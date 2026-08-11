@@ -188,6 +188,28 @@ export function topSellersByNetSales(rows: SalesDetailStatsRow[], limit = 10): N
   return topEntries(map, limit)
 }
 
+/** Top sellers by count of distinct items sold (excludes empty seller/item). */
+export function topSellersByDistinctItems(rows: SalesDetailStatsRow[], limit = 10): NamedValue[] {
+  const itemsBySeller = new Map<string, Set<string>>()
+
+  for (const row of rows) {
+    const seller = row.seller_name?.trim()
+    const item = row.item_name?.trim()
+    if (!seller || !item) continue
+    let set = itemsBySeller.get(seller)
+    if (!set) {
+      set = new Set()
+      itemsBySeller.set(seller, set)
+    }
+    set.add(item)
+  }
+
+  return [...itemsBySeller.entries()]
+    .map(([label, items]) => ({ label, value: items.size }))
+    .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label, 'ar'))
+    .slice(0, limit)
+}
+
 export function topCategoriesByQty(rows: SalesDetailStatsRow[], limit = 10): NamedValue[] {
   const map = new Map<string, number>()
   for (const row of rows) {
@@ -231,4 +253,5 @@ export const topProducts = topProductsByQty
 export const topCustomersByOrders = topCustomersByInvoices
 export const topBranches = topBranchesByNetSales
 export const topSellers = topSellersByNetSales
+export const topSellersByItems = topSellersByDistinctItems
 export const topCategories = topCategoriesByQty

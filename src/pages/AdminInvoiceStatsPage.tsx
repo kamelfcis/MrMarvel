@@ -49,6 +49,7 @@ import {
   topProductsByNetSales,
   topProductsByQty,
   topProductsPerBranch,
+  topSellersByDistinctItems,
   topSellersByNetSales,
   type NamedValue,
   type SalesDetailStatsRow,
@@ -96,6 +97,7 @@ type TableTabId =
   | 'customersSpend'
   | 'branches'
   | 'sellers'
+  | 'sellersItems'
   | 'categories'
 
 const TABLE_TABS: {
@@ -184,6 +186,16 @@ const TABLE_TABS: {
     columns: [
       { key: 'label', header: 'البائع' },
       { key: 'value', header: 'صافي المبيعات', align: 'end' },
+    ],
+  },
+  {
+    id: 'sellersItems',
+    label: 'البائعين (أصناف)',
+    accent: 'teal',
+    valueFormat: 'count',
+    columns: [
+      { key: 'label', header: 'البائع' },
+      { key: 'value', header: 'عدد الأصناف', align: 'end' },
     ],
   },
   {
@@ -515,6 +527,7 @@ export default function AdminInvoiceStatsPage() {
   const customersBySpend = useMemo(() => topCustomersBySpend(rows), [rows])
   const branches = useMemo(() => topBranchesByNetSales(rows), [rows])
   const sellers = useMemo(() => topSellersByNetSales(rows), [rows])
+  const sellersByItems = useMemo(() => topSellersByDistinctItems(rows), [rows])
   const categories = useMemo(() => topCategoriesByQty(rows), [rows])
 
   // Tables: full ranked lists
@@ -536,6 +549,7 @@ export default function AdminInvoiceStatsPage() {
   const tableCustomersBySpend = useMemo(() => topCustomersBySpend(rows, TABLE_LIMIT), [rows])
   const tableBranches = useMemo(() => topBranchesByNetSales(rows, TABLE_LIMIT), [rows])
   const tableSellers = useMemo(() => topSellersByNetSales(rows, TABLE_LIMIT), [rows])
+  const tableSellersByItems = useMemo(() => topSellersByDistinctItems(rows, TABLE_LIMIT), [rows])
   const tableCategories = useMemo(() => topCategoriesByQty(rows, TABLE_LIMIT), [rows])
 
   const tableRowsByTab: Record<TableTabId, NamedValue[]> = {
@@ -547,6 +561,7 @@ export default function AdminInvoiceStatsPage() {
     customersSpend: tableCustomersBySpend,
     branches: tableBranches,
     sellers: tableSellers,
+    sellersItems: tableSellersByItems,
     categories: tableCategories,
   }
 
@@ -646,6 +661,18 @@ export default function AdminInvoiceStatsPage() {
       tooltip: {
         callbacks: {
           label: (ctx) => `الفواتير: ${formatNumber(Number(ctx.raw ?? 0))}`,
+        },
+      },
+    },
+  }
+
+  const itemsCountBarOptions: ChartOptions<'bar'> = {
+    ...horizontalBarOptions,
+    plugins: {
+      ...horizontalBarOptions.plugins,
+      tooltip: {
+        callbacks: {
+          label: (ctx) => `عدد الأصناف: ${formatNumber(Number(ctx.raw ?? 0))}`,
         },
       },
     },
@@ -795,6 +822,13 @@ export default function AdminInvoiceStatsPage() {
             <Bar
               data={barData(sellers, 'صافي المبيعات', CHART_TEAL, CHART_TEAL_BORDER)}
               options={currencyBarOptions}
+            />
+          </StatsChartCard>
+
+          <StatsChartCard title="البائعين (أصناف)" empty={sellersByItems.length === 0}>
+            <Bar
+              data={barData(sellersByItems, 'عدد الأصناف', CHART_TEAL, CHART_TEAL_BORDER)}
+              options={itemsCountBarOptions}
             />
           </StatsChartCard>
 
