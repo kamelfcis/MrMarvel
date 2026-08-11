@@ -20,14 +20,22 @@ import {
   RefreshCw,
   RotateCcw,
   Receipt,
+  Table2,
   TrendingUp,
   Users,
 } from 'lucide-react'
 import { StatsChartCard } from '../components/invoices/StatsChartCard'
+import {
+  StatsDataTable,
+  type StatsAccent,
+  type StatsColumn,
+  type StatsValueFormat,
+} from '../components/invoices/StatsDataTable'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
+import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { cn } from '../components/ui/utils'
 import {
   buildDailySales,
@@ -63,6 +71,7 @@ const SELECT_FIELDS =
   'branch_name, item_name, item_category, seller_name, customer_mobile, sale_date, sold_qty, net_sales_amount, returns_amount, invoice_number'
 
 const PAGE_SIZE = 1000
+const TABLE_LIMIT = 9999
 
 const CHART_BLUE = 'rgba(37, 99, 235, 0.75)'
 const CHART_BLUE_BORDER = 'rgba(37, 99, 235, 1)'
@@ -76,6 +85,145 @@ const CHART_ROSE = 'rgba(225, 29, 72, 0.75)'
 const CHART_ROSE_BORDER = 'rgba(225, 29, 72, 1)'
 const CHART_INDIGO = 'rgba(79, 70, 229, 0.75)'
 const CHART_INDIGO_BORDER = 'rgba(79, 70, 229, 1)'
+
+type ViewMode = 'charts' | 'tables'
+type TableTabId =
+  | 'daily'
+  | 'perBranch'
+  | 'productsQty'
+  | 'productsSales'
+  | 'customersInvoices'
+  | 'customersSpend'
+  | 'branches'
+  | 'sellers'
+  | 'categories'
+
+const TABLE_TABS: {
+  id: TableTabId
+  label: string
+  accent: StatsAccent
+  valueFormat: StatsValueFormat
+  columns: StatsColumn[]
+}[] = [
+  {
+    id: 'daily',
+    label: 'المبيعات اليومية',
+    accent: 'blue',
+    valueFormat: 'currency',
+    columns: [
+      { key: 'label', header: 'التاريخ', dir: 'ltr' },
+      { key: 'value', header: 'صافي المبيعات', align: 'end' },
+    ],
+  },
+  {
+    id: 'perBranch',
+    label: 'منتج لكل فرع',
+    accent: 'teal',
+    valueFormat: 'qty',
+    columns: [
+      { key: 'label', header: 'الفرع' },
+      { key: 'meta', header: 'المنتج' },
+      { key: 'value', header: 'الكمية', align: 'end' },
+    ],
+  },
+  {
+    id: 'productsQty',
+    label: 'منتجات (كمية)',
+    accent: 'blue',
+    valueFormat: 'qty',
+    columns: [
+      { key: 'label', header: 'الصنف' },
+      { key: 'value', header: 'الكمية', align: 'end' },
+    ],
+  },
+  {
+    id: 'productsSales',
+    label: 'منتجات (مبيعات)',
+    accent: 'green',
+    valueFormat: 'currency',
+    columns: [
+      { key: 'label', header: 'الصنف' },
+      { key: 'value', header: 'صافي المبيعات', align: 'end' },
+    ],
+  },
+  {
+    id: 'customersInvoices',
+    label: 'عملاء (طلبات)',
+    accent: 'amber',
+    valueFormat: 'count',
+    columns: [
+      { key: 'label', header: 'الموبايل', dir: 'ltr' },
+      { key: 'value', header: 'عدد الفواتير', align: 'end' },
+    ],
+  },
+  {
+    id: 'customersSpend',
+    label: 'عملاء (إنفاق)',
+    accent: 'rose',
+    valueFormat: 'currency',
+    columns: [
+      { key: 'label', header: 'الموبايل', dir: 'ltr' },
+      { key: 'value', header: 'صافي المبيعات', align: 'end' },
+    ],
+  },
+  {
+    id: 'branches',
+    label: 'الفروع',
+    accent: 'indigo',
+    valueFormat: 'currency',
+    columns: [
+      { key: 'label', header: 'الفرع' },
+      { key: 'value', header: 'صافي المبيعات', align: 'end' },
+    ],
+  },
+  {
+    id: 'sellers',
+    label: 'البائعين',
+    accent: 'teal',
+    valueFormat: 'currency',
+    columns: [
+      { key: 'label', header: 'البائع' },
+      { key: 'value', header: 'صافي المبيعات', align: 'end' },
+    ],
+  },
+  {
+    id: 'categories',
+    label: 'مجموعات الأصناف',
+    accent: 'blue',
+    valueFormat: 'qty',
+    columns: [
+      { key: 'label', header: 'المجموعة' },
+      { key: 'value', header: 'الكمية', align: 'end' },
+    ],
+  },
+]
+
+const SUB_TAB_PILL: Record<StatsAccent, { idle: string; active: string }> = {
+  blue: {
+    idle: 'border-blue-200 bg-blue-50/70 text-blue-800 hover:bg-blue-100',
+    active: 'border-blue-500 bg-blue-600 text-white shadow-sm shadow-blue-200',
+  },
+  green: {
+    idle: 'border-green-200 bg-green-50/70 text-green-800 hover:bg-green-100',
+    active: 'border-green-500 bg-green-600 text-white shadow-sm shadow-green-200',
+  },
+  amber: {
+    idle: 'border-amber-200 bg-amber-50/70 text-amber-900 hover:bg-amber-100',
+    active: 'border-amber-500 bg-amber-600 text-white shadow-sm shadow-amber-200',
+  },
+  teal: {
+    idle: 'border-teal-200 bg-teal-50/70 text-teal-800 hover:bg-teal-100',
+    active: 'border-teal-500 bg-teal-600 text-white shadow-sm shadow-teal-200',
+  },
+  rose: {
+    idle: 'border-rose-200 bg-rose-50/70 text-rose-800 hover:bg-rose-100',
+    active: 'border-rose-500 bg-rose-600 text-white shadow-sm shadow-rose-200',
+  },
+  indigo: {
+    idle: 'border-indigo-200 bg-indigo-50/70 text-indigo-800 hover:bg-indigo-100',
+    active: 'border-indigo-500 bg-indigo-600 text-white shadow-sm shadow-indigo-200',
+  },
+}
 
 function formatCurrency(value: number | null | undefined) {
   if (value == null) return '—'
@@ -292,6 +440,8 @@ export default function AdminInvoiceStatsPage() {
   const [rows, setRows] = useState<SalesDetailStatsRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('charts')
+  const [activeTableTab, setActiveTableTab] = useState<TableTabId>('daily')
 
   useEffect(() => {
     let cancelled = false
@@ -355,6 +505,8 @@ export default function AdminInvoiceStatsPage() {
   }
 
   const kpis = useMemo(() => buildInvoiceStatsKpis(rows), [rows])
+
+  // Charts: Top 10 (default builder limits)
   const dailySales = useMemo(() => buildDailySales(rows), [rows])
   const perBranch = useMemo(() => topProductsPerBranch(rows), [rows])
   const productsQty = useMemo(() => topProductsByQty(rows), [rows])
@@ -364,6 +516,42 @@ export default function AdminInvoiceStatsPage() {
   const branches = useMemo(() => topBranchesByNetSales(rows), [rows])
   const sellers = useMemo(() => topSellersByNetSales(rows), [rows])
   const categories = useMemo(() => topCategoriesByQty(rows), [rows])
+
+  // Tables: full ranked lists
+  const tableDailySales = useMemo(
+    () =>
+      buildDailySales(rows).map((d) => ({
+        ...d,
+        label: formatDateMDY(d.label),
+      })),
+    [rows],
+  )
+  const tablePerBranch = useMemo(() => topProductsPerBranch(rows), [rows])
+  const tableProductsQty = useMemo(() => topProductsByQty(rows, TABLE_LIMIT), [rows])
+  const tableProductsSales = useMemo(() => topProductsByNetSales(rows, TABLE_LIMIT), [rows])
+  const tableCustomersByInvoices = useMemo(
+    () => topCustomersByInvoices(rows, TABLE_LIMIT),
+    [rows],
+  )
+  const tableCustomersBySpend = useMemo(() => topCustomersBySpend(rows, TABLE_LIMIT), [rows])
+  const tableBranches = useMemo(() => topBranchesByNetSales(rows, TABLE_LIMIT), [rows])
+  const tableSellers = useMemo(() => topSellersByNetSales(rows, TABLE_LIMIT), [rows])
+  const tableCategories = useMemo(() => topCategoriesByQty(rows, TABLE_LIMIT), [rows])
+
+  const tableRowsByTab: Record<TableTabId, NamedValue[]> = {
+    daily: tableDailySales,
+    perBranch: tablePerBranch,
+    productsQty: tableProductsQty,
+    productsSales: tableProductsSales,
+    customersInvoices: tableCustomersByInvoices,
+    customersSpend: tableCustomersBySpend,
+    branches: tableBranches,
+    sellers: tableSellers,
+    categories: tableCategories,
+  }
+
+  const activeTabConfig =
+    TABLE_TABS.find((t) => t.id === activeTableTab) ?? TABLE_TABS[0]
 
   const lineData = useMemo(
     () => ({
@@ -522,6 +710,27 @@ export default function AdminInvoiceStatsPage() {
 
       <KpiCards loading={loading} {...kpis} />
 
+      {!loading && !error && (
+        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+          <TabsList className="h-11 w-full justify-stretch gap-1 bg-slate-100/90 p-1 sm:w-auto sm:justify-center">
+            <TabsTrigger
+              value="charts"
+              className="flex-1 gap-2 data-[state=active]:bg-white data-[state=active]:text-blue-700 sm:flex-none sm:px-5"
+            >
+              <BarChart3 className="h-4 w-4" />
+              الرسوم البيانية
+            </TabsTrigger>
+            <TabsTrigger
+              value="tables"
+              className="flex-1 gap-2 data-[state=active]:bg-white data-[state=active]:text-blue-700 sm:flex-none sm:px-5"
+            >
+              <Table2 className="h-4 w-4" />
+              الجداول
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      )}
+
       {loading ? (
         <ChartsSkeleton />
       ) : error ? (
@@ -540,7 +749,7 @@ export default function AdminInvoiceStatsPage() {
           <p className="text-base font-medium text-gray-700">لا توجد بيانات في الفترة المحددة</p>
           <p className="text-sm text-gray-500">جرّب توسيع نطاق التاريخ أو رفع فواتير جديدة.</p>
         </div>
-      ) : (
+      ) : viewMode === 'charts' ? (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <StatsChartCard title="المبيعات اليومية" className="lg:col-span-2" empty={dailySales.length === 0}>
             <Line data={lineData} options={lineOptions} />
@@ -595,6 +804,36 @@ export default function AdminInvoiceStatsPage() {
               options={qtyBarOptions}
             />
           </StatsChartCard>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
+            {TABLE_TABS.map((tab) => {
+              const active = activeTableTab === tab.id
+              const pill = SUB_TAB_PILL[tab.accent]
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTableTab(tab.id)}
+                  className={cn(
+                    'shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors',
+                    active ? pill.active : pill.idle,
+                  )}
+                >
+                  {tab.label}
+                </button>
+              )
+            })}
+          </div>
+
+          <StatsDataTable
+            title={activeTabConfig.label}
+            rows={tableRowsByTab[activeTabConfig.id]}
+            columns={activeTabConfig.columns}
+            valueFormat={activeTabConfig.valueFormat}
+            accent={activeTabConfig.accent}
+          />
         </div>
       )}
     </div>
