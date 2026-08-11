@@ -1,5 +1,11 @@
 import { supabase } from './supabase'
 
+/** Stored in promotions.item_name — matches any sales line item. */
+export const PROMO_ALL_ITEMS = 'كل الاصناف'
+
+/** Stored in promotions.item_category — matches any sales line category. */
+export const PROMO_ALL_CATEGORIES = 'كل مجموعة الصنف'
+
 /** Tolerance when comparing applied vs allowed discount (% points). */
 export const DISCOUNT_TOLERANCE_PCT = 0.5
 
@@ -101,13 +107,23 @@ function branchMatches(promoBranch: string | null, saleBranch: string | null): b
   return promoBranch.trim() === saleBranch.trim()
 }
 
+export function isPromoAllItems(value: string | null | undefined): boolean {
+  if (!value?.trim()) return true
+  return value.trim() === PROMO_ALL_ITEMS
+}
+
+export function isPromoAllCategories(value: string | null | undefined): boolean {
+  if (!value?.trim()) return true
+  return value.trim() === PROMO_ALL_CATEGORIES
+}
+
 function itemMatches(promo: Promotion, row: SalesDetailRow): boolean {
   const nameOk =
-    !promo.item_name ||
-    (!!row.item_name && promo.item_name.trim() === row.item_name.trim())
+    isPromoAllItems(promo.item_name) ||
+    (!!row.item_name && promo.item_name!.trim() === row.item_name.trim())
   const catOk =
-    !promo.item_category ||
-    (!!row.item_category && promo.item_category.trim() === row.item_category.trim())
+    isPromoAllCategories(promo.item_category) ||
+    (!!row.item_category && promo.item_category!.trim() === row.item_category.trim())
   return nameOk && catOk
 }
 

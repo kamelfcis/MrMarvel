@@ -33,7 +33,14 @@ import {
   SelectValue,
 } from '../components/ui/select'
 import { useAuth } from '../contexts/AuthContext'
-import { type PromoType, type Promotion } from '../lib/discountAudit'
+import {
+  isPromoAllCategories,
+  isPromoAllItems,
+  PROMO_ALL_CATEGORIES,
+  PROMO_ALL_ITEMS,
+  type PromoType,
+  type Promotion,
+} from '../lib/discountAudit'
 import {
   fetchDistinctItemCategories,
   fetchDistinctItemNames,
@@ -89,6 +96,16 @@ function LoadingSkeleton() {
 
 function promoTypeLabel(type: PromoType) {
   return type === 'max_percent' ? 'نسبة خصم قصوى' : 'اشتري واحصل'
+}
+
+function promoItemLabel(value: string | null): string | null {
+  if (isPromoAllItems(value)) return PROMO_ALL_ITEMS
+  return value?.trim() || null
+}
+
+function promoCategoryLabel(value: string | null): string | null {
+  if (isPromoAllCategories(value)) return PROMO_ALL_CATEGORIES
+  return value?.trim() || null
 }
 
 export default function AdminPromotionsPage() {
@@ -151,19 +168,23 @@ export default function AdminPromotionsPage() {
   }, [fetchPromos, fetchCatalog])
 
   const itemNameSelectOptions = useMemo(() => {
+    const catalog = itemNameOptions.filter((o) => o !== PROMO_ALL_ITEMS)
+    const base = [PROMO_ALL_ITEMS, ...catalog]
     const current = form.item_name.trim()
-    if (current && !itemNameOptions.includes(current)) {
-      return [current, ...itemNameOptions]
+    if (current && !base.includes(current)) {
+      return [current, ...base]
     }
-    return itemNameOptions
+    return base
   }, [form.item_name, itemNameOptions])
 
   const itemCategorySelectOptions = useMemo(() => {
+    const catalog = itemCategoryOptions.filter((o) => o !== PROMO_ALL_CATEGORIES)
+    const base = [PROMO_ALL_CATEGORIES, ...catalog]
     const current = form.item_category.trim()
-    if (current && !itemCategoryOptions.includes(current)) {
-      return [current, ...itemCategoryOptions]
+    if (current && !base.includes(current)) {
+      return [current, ...base]
     }
-    return itemCategoryOptions
+    return base
   }, [form.item_category, itemCategoryOptions])
 
   const catalogEmptyMessage =
@@ -206,8 +227,12 @@ export default function AdminPromotionsPage() {
       name: promo.name,
       promo_type: promo.promo_type,
       branch_name: promo.branch_name ?? '',
-      item_name: promo.item_name ?? '',
-      item_category: promo.item_category ?? '',
+      item_name: isPromoAllItems(promo.item_name)
+        ? PROMO_ALL_ITEMS
+        : (promo.item_name ?? ''),
+      item_category: isPromoAllCategories(promo.item_category)
+        ? PROMO_ALL_CATEGORIES
+        : (promo.item_category ?? ''),
       max_discount_pct:
         promo.max_discount_pct != null ? String(promo.max_discount_pct) : '',
       buy_qty: promo.buy_qty != null ? String(promo.buy_qty) : '2',
@@ -228,7 +253,9 @@ export default function AdminPromotionsPage() {
     if (!form.name.trim()) return 'اسم العرض مطلوب'
     if (!form.valid_from || !form.valid_to) return 'تاريخ البداية والنهاية مطلوبان'
     if (form.valid_to < form.valid_from) return 'تاريخ النهاية يجب أن يكون بعد البداية'
-    if (!form.item_name.trim() && !form.item_category.trim()) {
+    const hasItemScope =
+      form.item_name.trim() !== '' || form.item_category.trim() !== ''
+    if (!hasItemScope) {
       return 'حدد اسم الصنف أو مجموعة الصنف على الأقل'
     }
     if (form.promo_type === 'max_percent') {
@@ -420,8 +447,16 @@ export default function AdminPromotionsPage() {
                           ) : (
                             <div>كل الفروع</div>
                           )}
-                          {promo.item_name && <div>صنف: {promo.item_name}</div>}
-                          {promo.item_category && <div>مجموعة: {promo.item_category}</div>}
+                          {(() => {
+                            const itemLabel = promoItemLabel(promo.item_name)
+                            const catLabel = promoCategoryLabel(promo.item_category)
+                            return (
+                              <>
+                                {itemLabel && <div>صنف: {itemLabel}</div>}
+                                {catLabel && <div>مجموعة: {catLabel}</div>}
+                              </>
+                            )
+                          })()}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-gray-700">
