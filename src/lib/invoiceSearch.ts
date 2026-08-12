@@ -85,3 +85,19 @@ export function filterInvoicesBySearch(
   if (!term) return invoices
   return invoices.filter((invoice) => invoiceMatchesSearch(invoice, term))
 }
+
+/** Partial, case-insensitive match on invoice_number only (رقم الفاتورة / رقم إذن البيع). */
+export function invoiceNumberMatches(invoice: InvoiceSummary, searchTerm: string): boolean {
+  const term = searchTerm.trim()
+  if (!term) return true
+  return textMatches(invoice.invoice_number, normalizeForSearch(term))
+}
+
+export function filterInvoicesByInvoiceNumber(
+  invoices: InvoiceSummary[],
+  searchTerm: string,
+): InvoiceSummary[] {
+  const term = searchTerm.trim()
+  if (!term) return invoices
+  return invoices.filter((invoice) => invoiceNumberMatches(invoice, term))
+}

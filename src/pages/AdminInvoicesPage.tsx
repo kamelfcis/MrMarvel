@@ -41,7 +41,7 @@ import {
 } from '../components/ui/select'
 import { cn } from '../components/ui/utils'
 import { useSalesImport } from '../hooks/useSalesImport'
-import { filterInvoicesBySearch } from '../lib/invoiceSearch'
+import { filterInvoicesByInvoiceNumber } from '../lib/invoiceSearch'
 import {
   DEFAULT_INVOICE_SORT_DIRECTION,
   DEFAULT_INVOICE_SORT_FIELD,
@@ -58,7 +58,7 @@ type InvoiceFilters = {
   seller: string
   dateFrom: string
   dateTo: string
-  search: string
+  invoiceNumber: string
 }
 
 const emptyFilters: InvoiceFilters = {
@@ -66,7 +66,7 @@ const emptyFilters: InvoiceFilters = {
   seller: '',
   dateFrom: '',
   dateTo: '',
-  search: '',
+  invoiceNumber: '',
 }
 
 function formatCurrency(value: number | null | undefined) {
@@ -214,7 +214,7 @@ export default function AdminInvoicesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<InvoiceFilters>(emptyFilters)
-  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [debouncedInvoiceNumber, setDebouncedInvoiceNumber] = useState('')
   const [branches, setBranches] = useState<string[]>([])
   const [sellers, setSellers] = useState<string[]>([])
   const [suspiciousInvoices, setSuspiciousInvoices] = useState<Set<string>>(new Set())
@@ -228,7 +228,7 @@ export default function AdminInvoicesPage() {
   useEffect(() => {
     const invoiceParam = searchParams.get('invoice')
     if (invoiceParam) {
-      setFilters((prev) => ({ ...prev, search: invoiceParam }))
+      setFilters((prev) => ({ ...prev, invoiceNumber: invoiceParam }))
     }
   }, [searchParams])
 
@@ -304,10 +304,10 @@ export default function AdminInvoicesPage() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setDebouncedSearch(filters.search)
+      setDebouncedInvoiceNumber(filters.invoiceNumber)
     }, 350)
     return () => window.clearTimeout(timer)
-  }, [filters.search])
+  }, [filters.invoiceNumber])
 
   useEffect(() => {
     void fetchInvoices()
@@ -315,14 +315,14 @@ export default function AdminInvoicesPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [filters, debouncedSearch, pageSize, sortField, sortDirection])
+  }, [filters, debouncedInvoiceNumber, pageSize, sortField, sortDirection])
 
   const filteredInvoices = useMemo(
-    () => filterInvoicesBySearch(allInvoices, debouncedSearch),
-    [allInvoices, debouncedSearch],
+    () => filterInvoicesByInvoiceNumber(allInvoices, debouncedInvoiceNumber),
+    [allInvoices, debouncedInvoiceNumber],
   )
 
-  const isSearching = debouncedSearch.trim().length > 0
+  const isSearching = debouncedInvoiceNumber.trim().length > 0
 
   const sortedInvoices = useMemo(
     () => sortInvoices(filteredInvoices, sortField, sortDirection),
@@ -359,7 +359,12 @@ export default function AdminInvoicesPage() {
     if (filters.seller) chips.push({ key: 'seller', label: `البائع: ${filters.seller}` })
     if (filters.dateFrom) chips.push({ key: 'dateFrom', label: `من: ${formatDateMDY(filters.dateFrom)}` })
     if (filters.dateTo) chips.push({ key: 'dateTo', label: `إلى: ${formatDateMDY(filters.dateTo)}` })
-    if (filters.search) chips.push({ key: 'search', label: `بحث: ${filters.search}` })
+    if (filters.invoiceNumber.trim()) {
+      chips.push({
+        key: 'invoiceNumber',
+        label: `رقم الفاتورة: ${filters.invoiceNumber.trim()}`,
+      })
+    }
     return chips
   }, [filters])
 
@@ -481,15 +486,16 @@ export default function AdminInvoicesPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="invoice-search">بحث</Label>
+              <Label htmlFor="invoice-number-filter">رقم الفاتورة / رقم إذن البيع</Label>
               <div className="relative">
                 <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <Input
-                  id="invoice-search"
-                  placeholder="بحث في جميع الأعمدة..."
-                  value={filters.search}
-                  onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))}
+                  id="invoice-number-filter"
+                  placeholder="رقم إذن البيع..."
+                  value={filters.invoiceNumber}
+                  onChange={(e) => setFilters((p) => ({ ...p, invoiceNumber: e.target.value }))}
                   className="pr-10"
+                  dir="ltr"
                 />
               </div>
             </div>
