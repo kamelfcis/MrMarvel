@@ -6,6 +6,7 @@ import {
   RefreshCw,
   RotateCcw,
   ScanSearch,
+  Search,
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -44,6 +45,7 @@ type Filters = {
   dateTo: string
   reason: string
   reviewed: 'all' | 'pending' | 'reviewed'
+  invoiceNumber: string
 }
 
 const emptyFilters: Filters = {
@@ -53,6 +55,7 @@ const emptyFilters: Filters = {
   dateTo: '',
   reason: '',
   reviewed: 'pending',
+  invoiceNumber: '',
 }
 
 function formatPct(value: number | null | undefined) {
@@ -87,6 +90,7 @@ export default function AdminDiscountAuditPage() {
   const [loading, setLoading] = useState(true)
   const [scanning, setScanning] = useState(false)
   const [filters, setFilters] = useState<Filters>(emptyFilters)
+  const [debouncedInvoiceNumber, setDebouncedInvoiceNumber] = useState('')
   const [branches, setBranches] = useState<string[]>([])
   const [sellers, setSellers] = useState<string[]>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -123,6 +127,9 @@ export default function AdminDiscountAuditPage() {
       if (filters.dateFrom) query = query.gte('sale_date', filters.dateFrom)
       if (filters.dateTo) query = query.lte('sale_date', filters.dateTo)
       if (filters.reason) query = query.eq('flag_reason', filters.reason)
+      if (debouncedInvoiceNumber.trim()) {
+        query = query.ilike('invoice_number', `%${debouncedInvoiceNumber.trim()}%`)
+      }
 
       const { data, error } = await query
       if (error) throw error
@@ -145,7 +152,14 @@ export default function AdminDiscountAuditPage() {
     } finally {
       setLoading(false)
     }
-  }, [filters])
+  }, [filters, debouncedInvoiceNumber])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedInvoiceNumber(filters.invoiceNumber)
+    }, 350)
+    return () => window.clearTimeout(timer)
+  }, [filters.invoiceNumber])
 
   useEffect(() => {
     void fetchFilterOptions()
@@ -163,7 +177,7 @@ export default function AdminDiscountAuditPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [filters, pageSize])
+  }, [filters, debouncedInvoiceNumber, pageSize])
 
   const totalPages = Math.max(1, Math.ceil(invoices.length / pageSize))
   const safePage = Math.min(currentPage, totalPages)
@@ -216,6 +230,12 @@ export default function AdminDiscountAuditPage() {
       chips.push({
         key: 'reviewed',
         label: filters.reviewed === 'pending' ? 'قيد المراجعة' : 'تمت المراجعة',
+      })
+    }
+    if (filters.invoiceNumber.trim()) {
+      chips.push({
+        key: 'invoiceNumber',
+        label: `رقم الفاتورة: ${filters.invoiceNumber.trim()}`,
       })
     }
     return chips
@@ -280,7 +300,21 @@ export default function AdminDiscountAuditPage() {
       </div>
 
       <Card>
-        <CardContent className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <CardContent className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="audit-invoice-number">رقم الفاتورة</Label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                id="audit-invoice-number"
+                placeholder="رقم إذن البيع..."
+                value={filters.invoiceNumber}
+                onChange={(e) => setFilters((f) => ({ ...f, invoiceNumber: e.target.value }))}
+                className="pr-10"
+                dir="ltr"
+              />
+            </div>
+          </div>
           <div className="space-y-1.5">
             <Label>الفرع</Label>
             <Select
