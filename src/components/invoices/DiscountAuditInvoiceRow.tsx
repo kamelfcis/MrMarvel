@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   FLAG_REASON_LABELS,
-  type DiscountFlag,
   type InvoiceDiscountAudit,
 } from '../../lib/discountAudit'
 import { supabase } from '../../lib/supabase'
@@ -26,81 +25,44 @@ type DiscountAuditInvoiceRowProps = {
   onReviewedChange: () => void | Promise<void>
 }
 
-function FlaggedLinesTable({
-  flags,
+function InvoiceSummaryCard({
+  invoice,
+  formatCurrency,
   formatPct,
-  onToggleFlag,
-  updatingId,
 }: {
-  flags: DiscountFlag[]
+  invoice: InvoiceDiscountAudit
+  formatCurrency: (value: number | null | undefined) => string
   formatPct: (value: number | null | undefined) => string
-  onToggleFlag: (flag: DiscountFlag, reviewed: boolean) => void
-  updatingId: string | null
 }) {
+  const head = invoice.flags[0]
+  const reason = head ? FLAG_REASON_LABELS[head.flag_reason] ?? head.flag_reason : '—'
+
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[560px] text-xs">
-        <thead>
-          <tr className="border-b border-gray-200 text-right text-gray-500">
-            <th className="px-3 py-2 font-medium">الصنف</th>
-            <th className="px-3 py-2 font-medium">مطبق</th>
-            <th className="px-3 py-2 font-medium">مسموح</th>
-            <th className="px-3 py-2 font-medium">السبب</th>
-            <th className="px-3 py-2 font-medium">إجراء</th>
-          </tr>
-        </thead>
-        <tbody>
-          {flags.map((flag) => (
-            <tr
-              key={flag.id}
-              className={cn(
-                'border-b border-gray-100 last:border-0',
-                !flag.reviewed && 'bg-red-50/50',
-              )}
-            >
-              <td className="px-3 py-2 font-medium text-gray-900">
-                {flag.item_name ?? '—'}
-              </td>
-              <td className="px-3 py-2 font-medium text-red-700">
-                {formatPct(flag.applied_discount_pct)}
-              </td>
-              <td className="px-3 py-2 text-green-700">
-                {formatPct(flag.allowed_discount_pct)}
-              </td>
-              <td className="px-3 py-2">
-                <Badge variant={!flag.reviewed ? 'destructive' : 'default'}>
-                  {FLAG_REASON_LABELS[flag.flag_reason] ?? flag.flag_reason}
-                </Badge>
-              </td>
-              <td className="px-3 py-2">
-                {flag.reviewed ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={updatingId === flag.id}
-                    onClick={() => onToggleFlag(flag, false)}
-                  >
-                    إعادة فتح
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    disabled={updatingId === flag.id}
-                    onClick={() => onToggleFlag(flag, true)}
-                  >
-                    {updatingId === flag.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                    )}
-                    تمت المراجعة
-                  </Button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="grid gap-3 p-4 text-sm sm:grid-cols-2">
+      <div>
+        <p className="text-xs text-gray-500">مطبق</p>
+        <p className="font-semibold text-red-700">
+          {formatPct(invoice.appliedDiscountPct)}
+        </p>
+      </div>
+      <div>
+        <p className="text-xs text-gray-500">مسموح</p>
+        <p className="font-semibold text-green-700">
+          {formatPct(invoice.allowedDiscountPct)}
+        </p>
+      </div>
+      <div>
+        <p className="text-xs text-gray-500">السبب</p>
+        <Badge variant="destructive" className="mt-0.5">
+          {reason}
+        </Badge>
+      </div>
+      <div>
+        <p className="text-xs text-gray-500">إجمالي الخصم</p>
+        <p className="font-semibold text-amber-700">
+          {formatCurrency(invoice.total_discount)}
+        </p>
+      </div>
     </div>
   )
 }
@@ -115,7 +77,6 @@ export function DiscountAuditInvoiceRow({
 }: DiscountAuditInvoiceRowProps) {
   const [open, setOpen] = useState(false)
   const [updatingInvoice, setUpdatingInvoice] = useState(false)
-  const [updatingId, setUpdatingId] = useState<string | null>(null)
 
   const pending = !invoice.reviewedAll
   const statusBadge = pending ? (
@@ -153,27 +114,6 @@ export function DiscountAuditInvoiceRow({
       toast.error('فشل تحديث حالة مراجعة الفاتورة')
     } finally {
       setUpdatingInvoice(false)
-    }
-  }
-
-  const toggleFlag = async (flag: DiscountFlag, reviewed: boolean) => {
-    setUpdatingId(flag.id)
-    try {
-      const { error } = await supabase
-        .from('discount_flags')
-        .update({
-          reviewed,
-          reviewed_at: reviewed ? new Date().toISOString() : null,
-        })
-        .eq('id', flag.id)
-      if (error) throw error
-      toast.success(reviewed ? 'تم تعليم التنبيه كمراجع' : 'أُعيد التنبيه للمراجعة')
-      await onReviewedChange()
-    } catch (err) {
-      console.error(err)
-      toast.error('فشل تحديث حالة المراجعة')
-    } finally {
-      setUpdatingId(null)
     }
   }
 
@@ -218,18 +158,12 @@ export function DiscountAuditInvoiceRow({
     </Button>
   )
 
-  const flaggedPanel = (
-    <div className="space-y-2">
-      <p className="text-xs font-medium text-gray-500">
-        البنود المشبوهة ({invoice.flagCount.toLocaleString('ar-EG')})
-      </p>
-      <FlaggedLinesTable
-        flags={invoice.flags}
-        formatPct={formatPct}
-        onToggleFlag={(flag, reviewed) => void toggleFlag(flag, reviewed)}
-        updatingId={updatingId}
-      />
-    </div>
+  const summaryPanel = (
+    <InvoiceSummaryCard
+      invoice={invoice}
+      formatCurrency={formatCurrency}
+      formatPct={formatPct}
+    />
   )
 
   const chevronClass = cn(
@@ -272,15 +206,19 @@ export function DiscountAuditInvoiceRow({
             <div className="min-w-0 flex-1 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-semibold text-gray-900">{invoice.invoice_number}</span>
-                <Badge variant="default">
-                  {invoice.flagCount.toLocaleString('ar-EG')} بند مشبوه
-                </Badge>
+                <Badge variant="destructive">خصم مشبوه</Badge>
                 {statusBadge}
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
                 <span>الكاشير: {invoice.seller_name ?? '—'}</span>
                 <span>الفرع: {invoice.branch_name ?? '—'}</span>
                 <span>التاريخ: {formatDate(invoice.sale_date)}</span>
+                <span className="font-medium text-red-700">
+                  نسبة الخصم: {formatPct(invoice.appliedDiscountPct)}
+                </span>
+                <span className="font-medium text-green-700">
+                  مسموح: {formatPct(invoice.allowedDiscountPct)}
+                </span>
                 <span className="font-medium text-amber-700">
                   إجمالي الخصم: {formatCurrency(invoice.total_discount)}
                 </span>
@@ -300,7 +238,7 @@ export function DiscountAuditInvoiceRow({
           )}
         >
           <div className="overflow-hidden rounded-lg border border-gray-200/90 bg-white/90 shadow-sm">
-            {flaggedPanel}
+            {summaryPanel}
           </div>
         </CollapsibleContent>
       </Collapsible>
@@ -339,8 +277,11 @@ export function DiscountAuditInvoiceRow({
         <td className="px-4 py-3 text-gray-700">{invoice.seller_name ?? '—'}</td>
         <td className="px-4 py-3 text-gray-600">{invoice.branch_name ?? '—'}</td>
         <td className="px-4 py-3 text-gray-600">{formatDate(invoice.sale_date)}</td>
-        <td className="px-4 py-3 text-gray-800">
-          {invoice.flagCount.toLocaleString('ar-EG')}
+        <td className="px-4 py-3 font-medium text-red-700">
+          {formatPct(invoice.appliedDiscountPct)}
+        </td>
+        <td className="px-4 py-3 font-medium text-green-700">
+          {formatPct(invoice.allowedDiscountPct)}
         </td>
         <td className="px-4 py-3 font-medium text-amber-700">
           {formatCurrency(invoice.total_discount)}
@@ -360,12 +301,12 @@ export function DiscountAuditInvoiceRow({
         </td>
       </tr>
       <tr className={cn(open && (pending ? 'border-x border-b border-red-200/80' : 'border-x border-b border-blue-200/80'))}>
-        <td colSpan={8} className="p-0">
+        <td colSpan={9} className="p-0">
           <Collapsible open={open} onOpenChange={setOpen}>
             <CollapsibleContent className={contentClass}>
               <div className="border-t border-blue-100/80 bg-gradient-to-b from-slate-50/80 to-white px-4 pb-4 pt-3">
                 <div className="overflow-hidden rounded-b-lg border border-gray-200/90 bg-white/90 shadow-sm">
-                  {flaggedPanel}
+                  {summaryPanel}
                 </div>
               </div>
             </CollapsibleContent>

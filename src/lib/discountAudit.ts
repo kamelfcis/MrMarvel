@@ -150,62 +150,77 @@ function bestMaxPercentPromo(promos: Promotion[]): Promotion | null {
   )
 }
 
-function isNearlyFree(row: SalesDetailRow): boolean {
-  const pct = toDiscountPercent(row.discount_pct)
-  if (pct >= 99.5 - DISCOUNT_TOLERANCE_PCT) return true
-  const unit = row.unit_price ?? 0
-  const qty = row.sold_qty ?? 0
-  const net = row.net_sales_amount ?? 0
-  if (qty > 0 && unit > 0 && net / (unit * qty) <= 0.01) return true
-  return false
+/** Invoice total discount % from line amounts: sum(discount) / sum(unit_price × qty) × 100. */
+export function computeInvoiceDiscountPct(lines: SalesDetailRow[]): number {
+  let gross = 0
+  let totalDiscount = 0
+  for (const row of lines) {
+    const qty = row.sold_qty ?? 0
+    const unit = row.unit_price ?? 0
+    gross += unit * qty
+    totalDiscount += row.discount_amount ?? 0
+  }
+  if (gross <= 0) return 0
+  return (totalDiscount / gross) * 100
 }
 
-function evaluateBuyXGetY(
-  promo: Promotion,
-  groupRows: SalesDetailRow[],
-): DiscountFlagInsert | null {
-  const buy = promo.buy_qty ?? 0
-  const get = promo.get_qty ?? 0
-  if (buy <= 0 || get <= 0) return null
-
-  const cycle = buy + get
-  const totalQty = groupRows.reduce((s, r) => s + (r.sold_qty ?? 0), 0)
-  if (totalQty < cycle) return null
-
-  const expectedFree = Math.floor(totalQty / cycle) * get
-  const freeQty = groupRows
-    .filter(isNearlyFree)
-    .reduce((s, r) => s + (r.sold_qty ?? 0), 0)
-
-  // Also treat high effective discount across the group as partial free units
-  const avgPct =
-    groupRows.reduce((s, r) => s + toDiscountPercent(r.discount_pct) * (r.sold_qty ?? 0), 0) /
-    Math.max(totalQty, 1)
-  const impliedFreeFromAvg = Math.round((avgPct / 100) * totalQty)
-
-  const observedFree = Math.max(freeQty, impliedFreeFromAvg >= expectedFree ? expectedFree : freeQty)
-
-  if (observedFree + 0.01 >= expectedFree) return null
-
-  // Flag the line with the highest discount in the group
-  const target = [...groupRows].sort(
-    (a, b) => toDiscountPercent(b.discount_pct) - toDiscountPercent(a.discount_pct),
-  )[0]
-  if (!target) return null
-
-  const allowedPct = (get / cycle) * 100
-  return {
-    sales_detail_id: target.id,
-    invoice_number: target.invoice_number,
-    seller_name: target.seller_name,
-    branch_name: target.branch_name,
-    sale_date: target.sale_date,
-    item_name: target.item_name,
-    applied_discount_pct: toDiscountPercent(target.discount_pct),
-    allowed_discount_pct: allowedPct,
-    flag_reason: 'buy_x_get_y_mismatch',
-    promotion_id: promo.id,
+function evaluateInvoiceDiscount(
+  rows: SalesDetailRow[],
+  promotions: Promotion[],
+  highDiscountNoPromoThresholdPct: number,
+): DiscountFlagInsert[] {
+  const byInvoice = new Map<string, SalesDetailRow[]>()
+  for (const row of rows) {
+    const key = row.invoice_number
+    if (!key) continue
+    const list = byInvoice.get(key) ?? []
+    list.push(row)
+    byInvoice.set(key, list)
   }
+
+  const flags: DiscountFlagInsert[] = []
+
+  for (const [, lines] of byInvoice) {
+    const head = lines[0]
+    if (!head) continue
+
+    const appliedInvoicePct = computeInvoiceDiscountPct(lines)
+
+    let bestPromo: Promotion | null = null
+    for (const row of lines) {
+      const matches = matchingPromos(promotions, row)
+      const maxPromo = bestMaxPercentPromo(matches)
+      if (!maxPromo) continue
+      if (
+        !bestPromo ||
+        (maxPromo.max_discount_pct ?? 0) > (bestPromo.max_discount_pct ?? 0)
+      ) {
+        bestPromo = maxPromo
+      }
+    }
+
+    const hasPromoMatch = bestPromo != null && bestPromo.max_discount_pct != null
+    const allowed = hasPromoMatch
+      ? Number(bestPromo!.max_discount_pct)
+      : highDiscountNoPromoThresholdPct
+
+    if (appliedInvoicePct <= allowed + DISCOUNT_TOLERANCE_PCT) continue
+
+    flags.push({
+      sales_detail_id: null,
+      invoice_number: head.invoice_number,
+      seller_name: head.seller_name,
+      branch_name: head.branch_name,
+      sale_date: head.sale_date,
+      item_name: null,
+      applied_discount_pct: appliedInvoicePct,
+      allowed_discount_pct: allowed,
+      flag_reason: hasPromoMatch ? 'over_max_discount' : 'no_matching_promo_but_high_discount',
+      promotion_id: hasPromoMatch ? bestPromo!.id : null,
+    })
+  }
+
+  return flags
 }
 
 function parseThresholdValue(value: unknown): number | null {
@@ -250,79 +265,7 @@ export function evaluateSalesRows(
   promotions: Promotion[],
   highDiscountNoPromoThresholdPct: number = DEFAULT_HIGH_DISCOUNT_NO_PROMO_THRESHOLD_PCT,
 ): DiscountFlagInsert[] {
-  const flags: DiscountFlagInsert[] = []
-  const seenDetailIds = new Set<number>()
-
-  // Per-line max_percent / high-discount checks
-  for (const row of rows) {
-    const applied = toDiscountPercent(row.discount_pct)
-    const matches = matchingPromos(promotions, row)
-    const maxPromo = bestMaxPercentPromo(matches)
-
-    if (maxPromo && maxPromo.max_discount_pct != null) {
-      const allowed = Number(maxPromo.max_discount_pct)
-      if (applied > allowed + DISCOUNT_TOLERANCE_PCT) {
-        flags.push({
-          sales_detail_id: row.id,
-          invoice_number: row.invoice_number,
-          seller_name: row.seller_name,
-          branch_name: row.branch_name,
-          sale_date: row.sale_date,
-          item_name: row.item_name,
-          applied_discount_pct: applied,
-          allowed_discount_pct: allowed,
-          flag_reason: 'over_max_discount',
-          promotion_id: maxPromo.id,
-        })
-        seenDetailIds.add(row.id)
-        continue
-      }
-    }
-
-    const hasAnyMatch = matches.length > 0
-    if (
-      !hasAnyMatch &&
-      applied > highDiscountNoPromoThresholdPct + DISCOUNT_TOLERANCE_PCT
-    ) {
-      flags.push({
-        sales_detail_id: row.id,
-        invoice_number: row.invoice_number,
-        seller_name: row.seller_name,
-        branch_name: row.branch_name,
-        sale_date: row.sale_date,
-        item_name: row.item_name,
-        applied_discount_pct: applied,
-        allowed_discount_pct: highDiscountNoPromoThresholdPct,
-        flag_reason: 'no_matching_promo_but_high_discount',
-        promotion_id: null,
-      })
-      seenDetailIds.add(row.id)
-    }
-  }
-
-  // buy_x_get_y: group by invoice + item_name
-  const byInvoiceItem = new Map<string, SalesDetailRow[]>()
-  for (const row of rows) {
-    const key = `${row.invoice_number}||${(row.item_name ?? '').trim()}`
-    const list = byInvoiceItem.get(key) ?? []
-    list.push(row)
-    byInvoiceItem.set(key, list)
-  }
-
-  for (const group of byInvoiceItem.values()) {
-    const sample = group[0]
-    if (!sample) continue
-    const matches = matchingPromos(promotions, sample).filter((p) => p.promo_type === 'buy_x_get_y')
-    for (const promo of matches) {
-      const flag = evaluateBuyXGetY(promo, group)
-      if (flag && flag.sales_detail_id != null && !seenDetailIds.has(flag.sales_detail_id)) {
-        flags.push(flag)
-        seenDetailIds.add(flag.sales_detail_id)
-      }
-    }
-  }
-
-  return flags
+  return evaluateInvoiceDiscount(rows, promotions, highDiscountNoPromoThresholdPct)
 }
 
 async function fetchActivePromotions(): Promise<Promotion[]> {
@@ -363,11 +306,33 @@ async function fetchSalesDetails(range: ScanRange): Promise<SalesDetailRow[]> {
   return (data as SalesDetailRow[]) ?? []
 }
 
-async function clearUnreviewedFlags(range: ScanRange, salesDetailIds: number[]): Promise<number> {
-  // Delete unreviewed flags for scanned sales_detail rows (or date range)
+async function clearUnreviewedFlags(
+  range: ScanRange,
+  salesDetailIds: number[],
+  invoiceNumbers: string[],
+): Promise<number> {
+  let cleared = 0
+  const chunkSize = 200
+
+  // Invoice-level flags use sales_detail_id null — clear by invoice_number
+  const uniqueInvoices = [...new Set(invoiceNumbers.filter(Boolean))]
+  if (uniqueInvoices.length > 0) {
+    for (let i = 0; i < uniqueInvoices.length; i += chunkSize) {
+      const chunk = uniqueInvoices.slice(i, i + chunkSize)
+      const { data, error } = await supabase
+        .from('discount_flags')
+        .delete()
+        .eq('reviewed', false)
+        .in('invoice_number', chunk)
+        .select('id')
+      if (error) throw error
+      cleared += data?.length ?? 0
+    }
+    return cleared
+  }
+
+  // Legacy: per-line flags tied to sales_detail_id
   if (salesDetailIds.length > 0) {
-    let cleared = 0
-    const chunkSize = 200
     for (let i = 0; i < salesDetailIds.length; i += chunkSize) {
       const chunk = salesDetailIds.slice(i, i + chunkSize)
       const { data, error } = await supabase
@@ -419,7 +384,8 @@ export async function scanDiscountFlags(range: ScanRange = {}): Promise<ScanResu
   ])
 
   const salesDetailIds = rows.map((r) => r.id)
-  const cleared = await clearUnreviewedFlags(range, salesDetailIds)
+  const invoiceNumbers = [...new Set(rows.map((r) => r.invoice_number).filter(Boolean))]
+  const cleared = await clearUnreviewedFlags(range, salesDetailIds, invoiceNumbers)
   const flags = evaluateSalesRows(rows, promotions, threshold)
   const flagged = await insertFlags(flags)
 
@@ -452,7 +418,8 @@ export type InvoiceDiscountAudit = {
   flagCount: number
   pendingCount: number
   reviewedAll: boolean
-  maxAppliedPct: number | null
+  appliedDiscountPct: number | null
+  allowedDiscountPct: number | null
   total_discount: number | null
 }
 
@@ -476,23 +443,17 @@ export function groupFlagsByInvoice(flags: DiscountFlag[]): InvoiceDiscountAudit
     })
     const head = sorted[0]
     const pendingCount = sorted.filter((f) => !f.reviewed).length
-    let maxAppliedPct: number | null = null
-    for (const f of sorted) {
-      if (f.applied_discount_pct == null) continue
-      if (maxAppliedPct == null || f.applied_discount_pct > maxAppliedPct) {
-        maxAppliedPct = f.applied_discount_pct
-      }
-    }
     rows.push({
       invoice_number,
       seller_name: head?.seller_name ?? null,
       branch_name: head?.branch_name ?? null,
       sale_date: head?.sale_date ?? null,
       flags: sorted,
-      flagCount: sorted.length,
+      flagCount: sorted.length > 0 ? 1 : 0,
       pendingCount,
       reviewedAll: pendingCount === 0,
-      maxAppliedPct,
+      appliedDiscountPct: head?.applied_discount_pct ?? null,
+      allowedDiscountPct: head?.allowed_discount_pct ?? null,
       total_discount: null,
     })
   }

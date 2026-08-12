@@ -436,7 +436,8 @@ export default function AdminDiscountAuditPage() {
                     <th className="px-4 py-3 font-medium">الكاشير</th>
                     <th className="px-4 py-3 font-medium">الفرع</th>
                     <th className="px-4 py-3 font-medium">التاريخ</th>
-                    <th className="px-4 py-3 font-medium">بنود مشبوهة</th>
+                    <th className="px-4 py-3 font-medium">نسبة الخصم</th>
+                    <th className="px-4 py-3 font-medium">مسموح</th>
                     <th className="px-4 py-3 font-medium">إجمالي الخصم</th>
                     <th className="px-4 py-3 font-medium">حالة</th>
                     <th className="px-4 py-3 font-medium">إجراء</th>
