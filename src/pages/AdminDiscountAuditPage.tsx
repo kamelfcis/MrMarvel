@@ -1,18 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import {
-  AlertTriangle,
   CheckCircle2,
-  ExternalLink,
   Filter,
+  Receipt,
   RefreshCw,
   RotateCcw,
   ScanSearch,
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { DiscountAuditInvoiceRow } from '../components/invoices/DiscountAuditInvoiceRow'
 import { TablePagination, type PageSize } from '../components/TablePagination'
-import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { Input } from '../components/ui/input'
@@ -25,12 +23,15 @@ import {
   SelectValue,
 } from '../components/ui/select'
 import {
+  attachInvoiceTotalDiscounts,
   DEFAULT_HIGH_DISCOUNT_NO_PROMO_THRESHOLD_PCT,
   fetchHighDiscountThreshold,
   FLAG_REASON_LABELS,
+  groupFlagsByInvoice,
   scanDiscountFlags,
   type DiscountFlag,
   type FlagReason,
+  type InvoiceDiscountAudit,
 } from '../lib/discountAudit'
 import { supabase } from '../lib/supabase'
 import { formatDateMDY } from '../lib/utils'
@@ -59,6 +60,11 @@ function formatPct(value: number | null | undefined) {
   return `${Number(value).toFixed(1)}%`
 }
 
+function formatCurrency(value: number | null | undefined) {
+  if (value == null) return '—'
+  return `${value.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`
+}
+
 function LoadingSkeleton() {
   return (
     <div className="space-y-0">
@@ -77,7 +83,7 @@ function LoadingSkeleton() {
 }
 
 export default function AdminDiscountAuditPage() {
-  const [flags, setFlags] = useState<DiscountFlag[]>([])
+  const [invoices, setInvoices] = useState<InvoiceDiscountAudit[]>([])
   const [loading, setLoading] = useState(true)
   const [scanning, setScanning] = useState(false)
   const [filters, setFilters] = useState<Filters>(emptyFilters)
@@ -102,9 +108,10 @@ export default function AdminDiscountAuditPage() {
     )
   }, [])
 
-  const fetchFlags = useCallback(async () => {
+  const fetchInvoices = useCallback(async () => {
     setLoading(true)
     try {
+      // Fetch flags without reviewed filter so invoice-level status is accurate.
       let query = supabase
         .from('discount_flags')
         .select('*')
@@ -116,16 +123,25 @@ export default function AdminDiscountAuditPage() {
       if (filters.dateFrom) query = query.gte('sale_date', filters.dateFrom)
       if (filters.dateTo) query = query.lte('sale_date', filters.dateTo)
       if (filters.reason) query = query.eq('flag_reason', filters.reason)
-      if (filters.reviewed === 'pending') query = query.eq('reviewed', false)
-      if (filters.reviewed === 'reviewed') query = query.eq('reviewed', true)
 
       const { data, error } = await query
       if (error) throw error
-      setFlags((data as DiscountFlag[]) ?? [])
+
+      const flags = (data as DiscountFlag[]) ?? []
+      let grouped = groupFlagsByInvoice(flags)
+
+      if (filters.reviewed === 'pending') {
+        grouped = grouped.filter((inv) => !inv.reviewedAll)
+      } else if (filters.reviewed === 'reviewed') {
+        grouped = grouped.filter((inv) => inv.reviewedAll)
+      }
+
+      const withDiscounts = await attachInvoiceTotalDiscounts(grouped)
+      setInvoices(withDiscounts)
     } catch (err) {
       console.error(err)
       toast.error('فشل تحميل تنبيهات الخصم')
-      setFlags([])
+      setInvoices([])
     } finally {
       setLoading(false)
     }
@@ -142,25 +158,25 @@ export default function AdminDiscountAuditPage() {
   }, [])
 
   useEffect(() => {
-    void fetchFlags()
-  }, [fetchFlags])
+    void fetchInvoices()
+  }, [fetchInvoices])
 
   useEffect(() => {
     setCurrentPage(1)
   }, [filters, pageSize])
 
-  const totalPages = Math.max(1, Math.ceil(flags.length / pageSize))
+  const totalPages = Math.max(1, Math.ceil(invoices.length / pageSize))
   const safePage = Math.min(currentPage, totalPages)
   const pageRows = useMemo(() => {
     const start = (safePage - 1) * pageSize
-    return flags.slice(start, start + pageSize)
-  }, [flags, safePage, pageSize])
+    return invoices.slice(start, start + pageSize)
+  }, [invoices, safePage, pageSize])
 
   const stats = useMemo(() => {
-    const pending = flags.filter((f) => !f.reviewed).length
-    const reviewed = flags.filter((f) => f.reviewed).length
-    return { total: flags.length, pending, reviewed }
-  }, [flags])
+    const pending = invoices.filter((inv) => !inv.reviewedAll).length
+    const reviewed = invoices.filter((inv) => inv.reviewedAll).length
+    return { total: invoices.length, pending, reviewed }
+  }, [invoices])
 
   const handleRescan = async () => {
     setScanning(true)
@@ -174,7 +190,7 @@ export default function AdminDiscountAuditPage() {
       toast.success(
         `تم الفحص: ${result.scanned.toLocaleString('ar-EG')} صف — ${result.flagged.toLocaleString('ar-EG')} تنبيه`,
       )
-      await fetchFlags()
+      await fetchInvoices()
       await fetchFilterOptions()
     } catch (err) {
       console.error(err)
@@ -182,24 +198,6 @@ export default function AdminDiscountAuditPage() {
     } finally {
       setScanning(false)
     }
-  }
-
-  const markReviewed = async (flag: DiscountFlag, reviewed: boolean) => {
-    const { error } = await supabase
-      .from('discount_flags')
-      .update({
-        reviewed,
-        reviewed_at: reviewed ? new Date().toISOString() : null,
-      })
-      .eq('id', flag.id)
-
-    if (error) {
-      toast.error('فشل تحديث حالة المراجعة')
-      console.error(error)
-      return
-    }
-    toast.success(reviewed ? 'تم تعليم التنبيه كمراجع' : 'أُعيد التنبيه للمراجعة')
-    await fetchFlags()
   }
 
   const activeChips = useMemo(() => {
@@ -229,12 +227,12 @@ export default function AdminDiscountAuditPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">مراجعة خصومات الكاشير</h1>
           <p className="mt-1 text-sm text-gray-500">
-            تنبيهات الخصومات التي تتجاوز العروض المعرّفة من المدير — الحد المسموح بدون
-            عرض: {noPromoThreshold.toLocaleString('ar-EG')}%
+            فواتير بخصومات تتجاوز العروض المعرّفة — الحد المسموح بدون عرض:{' '}
+            {noPromoThreshold.toLocaleString('ar-EG')}%
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => void fetchFlags()} disabled={loading}>
+          <Button variant="outline" onClick={() => void fetchInvoices()} disabled={loading}>
             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
             تحديث
           </Button>
@@ -248,9 +246,9 @@ export default function AdminDiscountAuditPage() {
       <div className="grid gap-3 sm:grid-cols-3">
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
-            <AlertTriangle className="h-8 w-8 text-amber-500" />
+            <Receipt className="h-8 w-8 text-amber-500" />
             <div>
-              <p className="text-xs text-gray-500">التنبيهات المعروضة</p>
+              <p className="text-xs text-gray-500">الفواتير المعروضة</p>
               <p className="text-xl font-bold text-gray-900">
                 {stats.total.toLocaleString('ar-EG')}
               </p>
@@ -418,12 +416,12 @@ export default function AdminDiscountAuditPage() {
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         {loading ? (
           <LoadingSkeleton />
-        ) : flags.length === 0 ? (
+        ) : invoices.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
             <div className="mb-4 rounded-full bg-green-50 p-4 text-green-600">
               <CheckCircle2 className="h-8 w-8" />
             </div>
-            <p className="text-base font-medium text-gray-700">لا توجد تنبيهات</p>
+            <p className="text-base font-medium text-gray-700">لا توجد فواتير مشبوهة</p>
             <p className="mt-1 max-w-md text-sm text-gray-500">
               جرّب تغيير الفلاتر أو اضغط «إعادة فحص» بعد استيراد الفواتير وتعريف العروض
             </p>
@@ -438,115 +436,39 @@ export default function AdminDiscountAuditPage() {
                     <th className="px-4 py-3 font-medium">الكاشير</th>
                     <th className="px-4 py-3 font-medium">الفرع</th>
                     <th className="px-4 py-3 font-medium">التاريخ</th>
-                    <th className="px-4 py-3 font-medium">الصنف</th>
-                    <th className="px-4 py-3 font-medium">مطبق</th>
-                    <th className="px-4 py-3 font-medium">مسموح</th>
-                    <th className="px-4 py-3 font-medium">السبب</th>
+                    <th className="px-4 py-3 font-medium">بنود مشبوهة</th>
+                    <th className="px-4 py-3 font-medium">إجمالي الخصم</th>
+                    <th className="px-4 py-3 font-medium">حالة</th>
                     <th className="px-4 py-3 font-medium">إجراء</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {pageRows.map((flag) => (
-                    <tr
-                      key={flag.id}
-                      className={cn(
-                        'border-b border-gray-100',
-                        !flag.reviewed && 'bg-red-50/60',
-                      )}
-                    >
-                      <td className="px-4 py-3">
-                        <Link
-                          to={`/admin/invoices?invoice=${encodeURIComponent(flag.invoice_number)}`}
-                          className="inline-flex items-center gap-1 font-medium text-blue-700 hover:underline"
-                        >
-                          {flag.invoice_number}
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-gray-700">{flag.seller_name ?? '—'}</td>
-                      <td className="px-4 py-3 text-gray-600">{flag.branch_name ?? '—'}</td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {formatDateMDY(flag.sale_date)}
-                      </td>
-                      <td className="px-4 py-3 text-gray-800">{flag.item_name ?? '—'}</td>
-                      <td className="px-4 py-3 font-medium text-red-700">
-                        {formatPct(flag.applied_discount_pct)}
-                      </td>
-                      <td className="px-4 py-3 text-green-700">
-                        {formatPct(flag.allowed_discount_pct)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant={!flag.reviewed ? 'destructive' : 'default'}>
-                          {FLAG_REASON_LABELS[flag.flag_reason] ?? flag.flag_reason}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        {flag.reviewed ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => void markReviewed(flag, false)}
-                          >
-                            إعادة فتح
-                          </Button>
-                        ) : (
-                          <Button size="sm" onClick={() => void markReviewed(flag, true)}>
-                            <CheckCircle2 className="h-4 w-4" />
-                            تمت المراجعة
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
+                  {pageRows.map((invoice) => (
+                    <DiscountAuditInvoiceRow
+                      key={invoice.invoice_number}
+                      invoice={invoice}
+                      formatCurrency={formatCurrency}
+                      formatDate={formatDateMDY}
+                      formatPct={formatPct}
+                      variant="table"
+                      onReviewedChange={fetchInvoices}
+                    />
                   ))}
                 </tbody>
               </table>
             </div>
 
             <div className="space-y-3 p-4 md:hidden">
-              {pageRows.map((flag) => (
-                <div
-                  key={flag.id}
-                  className={cn(
-                    'rounded-xl border p-4 shadow-sm',
-                    flag.reviewed
-                      ? 'border-gray-200 bg-white'
-                      : 'border-red-200 bg-red-50/70',
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <Link
-                      to={`/admin/invoices?invoice=${encodeURIComponent(flag.invoice_number)}`}
-                      className="font-semibold text-blue-700"
-                    >
-                      {flag.invoice_number}
-                    </Link>
-                    <Badge variant={!flag.reviewed ? 'destructive' : 'default'}>
-                      {FLAG_REASON_LABELS[flag.flag_reason]}
-                    </Badge>
-                  </div>
-                  <p className="mt-1 text-sm text-gray-700">{flag.item_name ?? '—'}</p>
-                  <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-gray-600">
-                    <span>الكاشير: {flag.seller_name ?? '—'}</span>
-                    <span>الفرع: {flag.branch_name ?? '—'}</span>
-                    <span>مطبق: {formatPct(flag.applied_discount_pct)}</span>
-                    <span>مسموح: {formatPct(flag.allowed_discount_pct)}</span>
-                  </div>
-                  <div className="mt-3">
-                    {flag.reviewed ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void markReviewed(flag, false)}
-                      >
-                        إعادة فتح
-                      </Button>
-                    ) : (
-                      <Button size="sm" onClick={() => void markReviewed(flag, true)}>
-                        تمت المراجعة
-                      </Button>
-                    )}
-                  </div>
-                </div>
+              {pageRows.map((invoice) => (
+                <DiscountAuditInvoiceRow
+                  key={invoice.invoice_number}
+                  invoice={invoice}
+                  formatCurrency={formatCurrency}
+                  formatDate={formatDateMDY}
+                  formatPct={formatPct}
+                  variant="card"
+                  onReviewedChange={fetchInvoices}
+                />
               ))}
             </div>
 
@@ -554,7 +476,7 @@ export default function AdminDiscountAuditPage() {
               currentPage={safePage}
               totalPages={totalPages}
               pageSize={pageSize}
-              totalItems={flags.length}
+              totalItems={invoices.length}
               onPageChange={setCurrentPage}
               onPageSizeChange={(size) => {
                 setPageSize(size)

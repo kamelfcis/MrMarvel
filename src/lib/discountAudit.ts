@@ -442,3 +442,100 @@ export const FLAG_REASON_LABELS: Record<FlagReason, string> = {
   buy_x_get_y_mismatch: 'عدم تطابق اشتري واحصل',
   no_matching_promo_but_high_discount: 'خصم عالي بدون عرض',
 }
+
+export type InvoiceDiscountAudit = {
+  invoice_number: string
+  seller_name: string | null
+  branch_name: string | null
+  sale_date: string | null
+  flags: DiscountFlag[]
+  flagCount: number
+  pendingCount: number
+  reviewedAll: boolean
+  maxAppliedPct: number | null
+  total_discount: number | null
+}
+
+/** Group discount_flags by invoice_number (metadata from the newest flag). */
+export function groupFlagsByInvoice(flags: DiscountFlag[]): InvoiceDiscountAudit[] {
+  const byInvoice = new Map<string, DiscountFlag[]>()
+  for (const flag of flags) {
+    const key = flag.invoice_number
+    if (!key) continue
+    const list = byInvoice.get(key) ?? []
+    list.push(flag)
+    byInvoice.set(key, list)
+  }
+
+  const rows: InvoiceDiscountAudit[] = []
+  for (const [invoice_number, invoiceFlags] of byInvoice) {
+    const sorted = [...invoiceFlags].sort((a, b) => {
+      const dateCmp = (b.sale_date ?? '').localeCompare(a.sale_date ?? '')
+      if (dateCmp !== 0) return dateCmp
+      return (b.created_at ?? '').localeCompare(a.created_at ?? '')
+    })
+    const head = sorted[0]
+    const pendingCount = sorted.filter((f) => !f.reviewed).length
+    let maxAppliedPct: number | null = null
+    for (const f of sorted) {
+      if (f.applied_discount_pct == null) continue
+      if (maxAppliedPct == null || f.applied_discount_pct > maxAppliedPct) {
+        maxAppliedPct = f.applied_discount_pct
+      }
+    }
+    rows.push({
+      invoice_number,
+      seller_name: head?.seller_name ?? null,
+      branch_name: head?.branch_name ?? null,
+      sale_date: head?.sale_date ?? null,
+      flags: sorted,
+      flagCount: sorted.length,
+      pendingCount,
+      reviewedAll: pendingCount === 0,
+      maxAppliedPct,
+      total_discount: null,
+    })
+  }
+
+  rows.sort((a, b) => {
+    const dateCmp = (b.sale_date ?? '').localeCompare(a.sale_date ?? '')
+    if (dateCmp !== 0) return dateCmp
+    return b.invoice_number.localeCompare(a.invoice_number)
+  })
+  return rows
+}
+
+/** Fetch total_discount from invoice_summary for the given invoice numbers. */
+export async function fetchInvoiceTotalDiscounts(
+  invoiceNumbers: string[],
+): Promise<Map<string, number | null>> {
+  const result = new Map<string, number | null>()
+  const unique = [...new Set(invoiceNumbers.filter(Boolean))]
+  if (unique.length === 0) return result
+
+  const chunkSize = 100
+  for (let i = 0; i < unique.length; i += chunkSize) {
+    const chunk = unique.slice(i, i + chunkSize)
+    const { data, error } = await supabase
+      .from('invoice_summary')
+      .select('invoice_number, total_discount')
+      .in('invoice_number', chunk)
+    if (error) throw error
+    for (const row of data ?? []) {
+      result.set(row.invoice_number, row.total_discount ?? null)
+    }
+  }
+  return result
+}
+
+/** Merge invoice_summary.total_discount into grouped audit rows. */
+export async function attachInvoiceTotalDiscounts(
+  rows: InvoiceDiscountAudit[],
+): Promise<InvoiceDiscountAudit[]> {
+  if (rows.length === 0) return rows
+  const discounts = await fetchInvoiceTotalDiscounts(rows.map((r) => r.invoice_number))
+  return rows.map((row) => ({
+    ...row,
+    total_discount: discounts.get(row.invoice_number) ?? null,
+  }))
+}
