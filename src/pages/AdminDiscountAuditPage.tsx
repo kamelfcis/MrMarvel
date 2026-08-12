@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '../components/ui/select'
 import {
-  attachInvoiceTotalDiscounts,
+  attachInvoiceSummaries,
   DEFAULT_HIGH_DISCOUNT_NO_PROMO_THRESHOLD_PCT,
   fetchHighDiscountThreshold,
   FLAG_REASON_LABELS,
@@ -136,8 +136,8 @@ export default function AdminDiscountAuditPage() {
         grouped = grouped.filter((inv) => inv.reviewedAll)
       }
 
-      const withDiscounts = await attachInvoiceTotalDiscounts(grouped)
-      setInvoices(withDiscounts)
+      const withSummaries = await attachInvoiceSummaries(grouped)
+      setInvoices(withSummaries)
     } catch (err) {
       console.error(err)
       toast.error('فشل تحميل تنبيهات الخصم')
@@ -436,6 +436,7 @@ export default function AdminDiscountAuditPage() {
                     <th className="px-4 py-3 font-medium">الكاشير</th>
                     <th className="px-4 py-3 font-medium">الفرع</th>
                     <th className="px-4 py-3 font-medium">التاريخ</th>
+                    <th className="px-4 py-3 font-medium">إجمالي الفاتورة</th>
                     <th className="px-4 py-3 font-medium">نسبة الخصم</th>
                     <th className="px-4 py-3 font-medium">مسموح</th>
                     <th className="px-4 py-3 font-medium">إجمالي الخصم</th>

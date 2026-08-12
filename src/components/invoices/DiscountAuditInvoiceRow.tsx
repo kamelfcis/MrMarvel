@@ -15,6 +15,8 @@ import {
   CollapsibleTrigger,
 } from '../ui/collapsible'
 import { cn } from '../ui/utils'
+import { CustomerMobileCell } from './CustomerMobileCell'
+import { InvoiceLineItemsPanel } from './InvoiceLineItemsPanel'
 
 type DiscountAuditInvoiceRowProps = {
   invoice: InvoiceDiscountAudit
@@ -62,6 +64,100 @@ function InvoiceSummaryCard({
         <p className="font-semibold text-amber-700">
           {formatCurrency(invoice.total_discount)}
         </p>
+      </div>
+    </div>
+  )
+}
+
+function InvoiceTotalsStrip({
+  invoice,
+  formatCurrency,
+}: {
+  invoice: InvoiceDiscountAudit
+  formatCurrency: (value: number | null | undefined) => string
+}) {
+  return (
+    <div className="grid gap-3 border-t border-gray-100 p-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+      <div>
+        <p className="text-xs text-gray-500">إجمالي الفاتورة</p>
+        <p className="font-semibold text-green-700">
+          {formatCurrency(invoice.total_net_sales)}
+        </p>
+      </div>
+      <div>
+        <p className="text-xs text-gray-500">إجمالي الخصم</p>
+        <p className="font-semibold text-amber-700">
+          {formatCurrency(invoice.total_discount)}
+        </p>
+      </div>
+      <div>
+        <p className="text-xs text-gray-500">المرتجعات</p>
+        <p className="font-semibold text-red-600">
+          {formatCurrency(invoice.total_returns)}
+        </p>
+      </div>
+      <div>
+        <p className="text-xs text-gray-500">عدد البنود</p>
+        <p className="font-semibold text-gray-900">
+          {invoice.line_items_count?.toLocaleString('ar-EG') ?? '—'}
+        </p>
+      </div>
+      <div>
+        <p className="text-xs text-gray-500">إجمالي الكمية</p>
+        <p className="font-semibold text-gray-900">
+          {invoice.total_qty?.toLocaleString('ar-EG') ?? '—'}
+        </p>
+      </div>
+      <div>
+        <p className="text-xs text-gray-500">موبيل العميل</p>
+        <p className="font-semibold text-gray-900" dir="ltr">
+          <CustomerMobileCell mobile={invoice.customer_mobile} />
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function ExpandPanel({
+  invoice,
+  open,
+  formatCurrency,
+  formatPct,
+}: {
+  invoice: InvoiceDiscountAudit
+  open: boolean
+  formatCurrency: (value: number | null | undefined) => string
+  formatPct: (value: number | null | undefined) => string
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="overflow-hidden rounded-lg border border-gray-200/90 bg-white/90 shadow-sm">
+        <p className="border-b border-gray-100 bg-gray-50/80 px-4 py-2 text-xs font-medium text-gray-600">
+          مراجعة الخصم
+        </p>
+        <InvoiceSummaryCard
+          invoice={invoice}
+          formatCurrency={formatCurrency}
+          formatPct={formatPct}
+        />
+      </div>
+
+      <div className="overflow-hidden rounded-lg border border-gray-200/90 bg-white/90 shadow-sm">
+        <p className="border-b border-gray-100 bg-gray-50/80 px-4 py-2 text-xs font-medium text-gray-600">
+          ملخص الفاتورة
+        </p>
+        <InvoiceTotalsStrip invoice={invoice} formatCurrency={formatCurrency} />
+      </div>
+
+      <div className="overflow-hidden rounded-lg border border-gray-200/90 bg-white/90 shadow-sm">
+        <p className="border-b border-gray-100 bg-gray-50/80 px-4 py-2 text-xs font-medium text-gray-600">
+          بنود الفاتورة
+        </p>
+        <InvoiceLineItemsPanel
+          invoiceNumber={invoice.invoice_number}
+          open={open}
+          formatCurrency={formatCurrency}
+        />
       </div>
     </div>
   )
@@ -158,9 +254,10 @@ export function DiscountAuditInvoiceRow({
     </Button>
   )
 
-  const summaryPanel = (
-    <InvoiceSummaryCard
+  const expandPanel = (
+    <ExpandPanel
       invoice={invoice}
+      open={open}
       formatCurrency={formatCurrency}
       formatPct={formatPct}
     />
@@ -213,6 +310,9 @@ export function DiscountAuditInvoiceRow({
                 <span>الكاشير: {invoice.seller_name ?? '—'}</span>
                 <span>الفرع: {invoice.branch_name ?? '—'}</span>
                 <span>التاريخ: {formatDate(invoice.sale_date)}</span>
+                <span className="font-medium text-green-700">
+                  إجمالي الفاتورة: {formatCurrency(invoice.total_net_sales)}
+                </span>
                 <span className="font-medium text-red-700">
                   نسبة الخصم: {formatPct(invoice.appliedDiscountPct)}
                 </span>
@@ -237,9 +337,7 @@ export function DiscountAuditInvoiceRow({
             'border-t border-blue-100/80 bg-gradient-to-b from-slate-50/80 to-white px-4 py-3',
           )}
         >
-          <div className="overflow-hidden rounded-lg border border-gray-200/90 bg-white/90 shadow-sm">
-            {summaryPanel}
-          </div>
+          {expandPanel}
         </CollapsibleContent>
       </Collapsible>
     )
@@ -277,6 +375,9 @@ export function DiscountAuditInvoiceRow({
         <td className="px-4 py-3 text-gray-700">{invoice.seller_name ?? '—'}</td>
         <td className="px-4 py-3 text-gray-600">{invoice.branch_name ?? '—'}</td>
         <td className="px-4 py-3 text-gray-600">{formatDate(invoice.sale_date)}</td>
+        <td className="px-4 py-3 font-medium text-green-700">
+          {formatCurrency(invoice.total_net_sales)}
+        </td>
         <td className="px-4 py-3 font-medium text-red-700">
           {formatPct(invoice.appliedDiscountPct)}
         </td>
@@ -301,13 +402,11 @@ export function DiscountAuditInvoiceRow({
         </td>
       </tr>
       <tr className={cn(open && (pending ? 'border-x border-b border-red-200/80' : 'border-x border-b border-blue-200/80'))}>
-        <td colSpan={9} className="p-0">
+        <td colSpan={10} className="p-0">
           <Collapsible open={open} onOpenChange={setOpen}>
             <CollapsibleContent className={contentClass}>
               <div className="border-t border-blue-100/80 bg-gradient-to-b from-slate-50/80 to-white px-4 pb-4 pt-3">
-                <div className="overflow-hidden rounded-b-lg border border-gray-200/90 bg-white/90 shadow-sm">
-                  {summaryPanel}
-                </div>
+                {expandPanel}
               </div>
             </CollapsibleContent>
           </Collapsible>

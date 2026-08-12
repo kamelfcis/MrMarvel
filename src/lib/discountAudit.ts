@@ -409,6 +409,15 @@ export const FLAG_REASON_LABELS: Record<FlagReason, string> = {
   no_matching_promo_but_high_discount: 'خصم عالي بدون عرض',
 }
 
+export type InvoiceSummaryFields = {
+  total_net_sales: number | null
+  total_discount: number | null
+  total_returns: number | null
+  line_items_count: number | null
+  customer_mobile: string | null
+  total_qty: number | null
+}
+
 export type InvoiceDiscountAudit = {
   invoice_number: string
   seller_name: string | null
@@ -420,7 +429,12 @@ export type InvoiceDiscountAudit = {
   reviewedAll: boolean
   appliedDiscountPct: number | null
   allowedDiscountPct: number | null
+  total_net_sales: number | null
   total_discount: number | null
+  total_returns: number | null
+  line_items_count: number | null
+  customer_mobile: string | null
+  total_qty: number | null
 }
 
 /** Group discount_flags by invoice_number (metadata from the newest flag). */
@@ -454,7 +468,12 @@ export function groupFlagsByInvoice(flags: DiscountFlag[]): InvoiceDiscountAudit
       reviewedAll: pendingCount === 0,
       appliedDiscountPct: head?.applied_discount_pct ?? null,
       allowedDiscountPct: head?.allowed_discount_pct ?? null,
+      total_net_sales: null,
       total_discount: null,
+      total_returns: null,
+      line_items_count: null,
+      customer_mobile: null,
+      total_qty: null,
     })
   }
 
@@ -466,11 +485,11 @@ export function groupFlagsByInvoice(flags: DiscountFlag[]): InvoiceDiscountAudit
   return rows
 }
 
-/** Fetch total_discount from invoice_summary for the given invoice numbers. */
-export async function fetchInvoiceTotalDiscounts(
+/** Fetch invoice_summary fields for the given invoice numbers. */
+export async function fetchInvoiceSummaries(
   invoiceNumbers: string[],
-): Promise<Map<string, number | null>> {
-  const result = new Map<string, number | null>()
+): Promise<Map<string, InvoiceSummaryFields>> {
+  const result = new Map<string, InvoiceSummaryFields>()
   const unique = [...new Set(invoiceNumbers.filter(Boolean))]
   if (unique.length === 0) return result
 
@@ -479,24 +498,34 @@ export async function fetchInvoiceTotalDiscounts(
     const chunk = unique.slice(i, i + chunkSize)
     const { data, error } = await supabase
       .from('invoice_summary')
-      .select('invoice_number, total_discount')
+      .select(
+        'invoice_number, total_net_sales, total_discount, total_returns, line_items_count, customer_mobile, total_qty',
+      )
       .in('invoice_number', chunk)
     if (error) throw error
     for (const row of data ?? []) {
-      result.set(row.invoice_number, row.total_discount ?? null)
+      result.set(row.invoice_number, {
+        total_net_sales: row.total_net_sales ?? null,
+        total_discount: row.total_discount ?? null,
+        total_returns: row.total_returns ?? null,
+        line_items_count: row.line_items_count ?? null,
+        customer_mobile: row.customer_mobile ?? null,
+        total_qty: row.total_qty ?? null,
+      })
     }
   }
   return result
 }
 
-/** Merge invoice_summary.total_discount into grouped audit rows. */
-export async function attachInvoiceTotalDiscounts(
+/** Merge invoice_summary fields into grouped audit rows. */
+export async function attachInvoiceSummaries(
   rows: InvoiceDiscountAudit[],
 ): Promise<InvoiceDiscountAudit[]> {
   if (rows.length === 0) return rows
-  const discounts = await fetchInvoiceTotalDiscounts(rows.map((r) => r.invoice_number))
-  return rows.map((row) => ({
-    ...row,
-    total_discount: discounts.get(row.invoice_number) ?? null,
-  }))
+  const summaries = await fetchInvoiceSummaries(rows.map((r) => r.invoice_number))
+  return rows.map((row) => {
+    const summary = summaries.get(row.invoice_number)
+    if (!summary) return row
+    return { ...row, ...summary }
+  })
 }
