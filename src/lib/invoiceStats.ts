@@ -170,6 +170,17 @@ export function topCustomersBySpend(rows: SalesDetailStatsRow[], limit = 10): Na
   return topEntries(map, limit)
 }
 
+/** Top customers by total sold quantity (pieces). */
+export function topCustomersByQty(rows: SalesDetailStatsRow[], limit = 10): NamedValue[] {
+  const map = new Map<string, number>()
+  for (const row of rows) {
+    const mobile = row.customer_mobile?.trim()
+    if (!mobile) continue
+    map.set(mobile, (map.get(mobile) ?? 0) + n(row.sold_qty))
+  }
+  return topEntries(map, limit)
+}
+
 export function topBranchesByNetSales(rows: SalesDetailStatsRow[], limit = 10): NamedValue[] {
   const map = new Map<string, number>()
   for (const row of rows) {
@@ -184,6 +195,17 @@ export function topSellersByNetSales(rows: SalesDetailStatsRow[], limit = 10): N
   for (const row of rows) {
     const key = labelOf(row.seller_name)
     map.set(key, (map.get(key) ?? 0) + n(row.net_sales_amount))
+  }
+  return topEntries(map, limit)
+}
+
+/** Top sellers by total sold quantity (pieces). */
+export function topSellersByQty(rows: SalesDetailStatsRow[], limit = 10): NamedValue[] {
+  const map = new Map<string, number>()
+  for (const row of rows) {
+    const seller = row.seller_name?.trim()
+    if (!seller) continue
+    map.set(seller, (map.get(seller) ?? 0) + n(row.sold_qty))
   }
   return topEntries(map, limit)
 }

@@ -45,6 +45,7 @@ import {
   topBranchesByNetSales,
   topCategoriesByQty,
   topCustomersByInvoices,
+  topCustomersByQty,
   topCustomersBySpend,
   topProductsByNetSales,
   topProductsByQty,
@@ -52,6 +53,7 @@ import {
   topSellersByDistinctItems,
   topSellersByInvoices,
   topSellersByNetSales,
+  topSellersByQty,
   type NamedValue,
   type SalesDetailStatsRow,
 } from '../lib/invoiceStats'
@@ -95,10 +97,12 @@ type TableTabId =
   | 'productsQty'
   | 'productsSales'
   | 'customersInvoices'
+  | 'customersQty'
   | 'customersSpend'
   | 'branches'
   | 'sellers'
   | 'sellersInvoices'
+  | 'sellersQty'
   | 'sellersItems'
   | 'categories'
 
@@ -161,6 +165,16 @@ const TABLE_TABS: {
     ],
   },
   {
+    id: 'customersQty',
+    label: 'عملاء (قطع)',
+    accent: 'amber',
+    valueFormat: 'qty',
+    columns: [
+      { key: 'label', header: 'الموبايل', dir: 'ltr' },
+      { key: 'value', header: 'عدد القطع', align: 'end' },
+    ],
+  },
+  {
     id: 'customersSpend',
     label: 'عملاء (إنفاق)',
     accent: 'rose',
@@ -198,6 +212,16 @@ const TABLE_TABS: {
     columns: [
       { key: 'label', header: 'البائع' },
       { key: 'value', header: 'عدد الفواتير', align: 'end' },
+    ],
+  },
+  {
+    id: 'sellersQty',
+    label: 'البائعين (قطع)',
+    accent: 'teal',
+    valueFormat: 'qty',
+    columns: [
+      { key: 'label', header: 'البائع' },
+      { key: 'value', header: 'عدد القطع', align: 'end' },
     ],
   },
   {
@@ -536,10 +560,12 @@ export default function AdminInvoiceStatsPage() {
   const productsQty = useMemo(() => topProductsByQty(rows), [rows])
   const productsSales = useMemo(() => topProductsByNetSales(rows), [rows])
   const customersByInvoices = useMemo(() => topCustomersByInvoices(rows), [rows])
+  const customersByQty = useMemo(() => topCustomersByQty(rows), [rows])
   const customersBySpend = useMemo(() => topCustomersBySpend(rows), [rows])
   const branches = useMemo(() => topBranchesByNetSales(rows), [rows])
   const sellers = useMemo(() => topSellersByNetSales(rows), [rows])
   const sellersByInvoices = useMemo(() => topSellersByInvoices(rows), [rows])
+  const sellersByQty = useMemo(() => topSellersByQty(rows), [rows])
   const sellersByItems = useMemo(() => topSellersByDistinctItems(rows), [rows])
   const categories = useMemo(() => topCategoriesByQty(rows), [rows])
 
@@ -559,10 +585,12 @@ export default function AdminInvoiceStatsPage() {
     () => topCustomersByInvoices(rows, TABLE_LIMIT),
     [rows],
   )
+  const tableCustomersByQty = useMemo(() => topCustomersByQty(rows, TABLE_LIMIT), [rows])
   const tableCustomersBySpend = useMemo(() => topCustomersBySpend(rows, TABLE_LIMIT), [rows])
   const tableBranches = useMemo(() => topBranchesByNetSales(rows, TABLE_LIMIT), [rows])
   const tableSellers = useMemo(() => topSellersByNetSales(rows, TABLE_LIMIT), [rows])
   const tableSellersByInvoices = useMemo(() => topSellersByInvoices(rows, TABLE_LIMIT), [rows])
+  const tableSellersByQty = useMemo(() => topSellersByQty(rows, TABLE_LIMIT), [rows])
   const tableSellersByItems = useMemo(() => topSellersByDistinctItems(rows, TABLE_LIMIT), [rows])
   const tableCategories = useMemo(() => topCategoriesByQty(rows, TABLE_LIMIT), [rows])
 
@@ -572,10 +600,12 @@ export default function AdminInvoiceStatsPage() {
     productsQty: tableProductsQty,
     productsSales: tableProductsSales,
     customersInvoices: tableCustomersByInvoices,
+    customersQty: tableCustomersByQty,
     customersSpend: tableCustomersBySpend,
     branches: tableBranches,
     sellers: tableSellers,
     sellersInvoices: tableSellersByInvoices,
+    sellersQty: tableSellersByQty,
     sellersItems: tableSellersByItems,
     categories: tableCategories,
   }
@@ -819,6 +849,13 @@ export default function AdminInvoiceStatsPage() {
             />
           </StatsChartCard>
 
+          <StatsChartCard title="عدد القطع لكل عميل" empty={customersByQty.length === 0}>
+            <Bar
+              data={barData(customersByQty, 'عدد القطع', CHART_AMBER, CHART_AMBER_BORDER)}
+              options={qtyBarOptions}
+            />
+          </StatsChartCard>
+
           <StatsChartCard title="أعلى العملاء إنفاقاً" empty={customersBySpend.length === 0}>
             <Bar
               data={barData(customersBySpend, 'صافي المبيعات', CHART_ROSE, CHART_ROSE_BORDER)}
@@ -844,6 +881,13 @@ export default function AdminInvoiceStatsPage() {
             <Bar
               data={barData(sellersByInvoices, 'عدد الفواتير', CHART_TEAL, CHART_TEAL_BORDER)}
               options={countBarOptions}
+            />
+          </StatsChartCard>
+
+          <StatsChartCard title="عدد القطع لكل بائع" empty={sellersByQty.length === 0}>
+            <Bar
+              data={barData(sellersByQty, 'عدد القطع', CHART_TEAL, CHART_TEAL_BORDER)}
+              options={qtyBarOptions}
             />
           </StatsChartCard>
 
