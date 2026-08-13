@@ -50,6 +50,7 @@ import {
   topProductsByQty,
   topProductsPerBranch,
   topSellersByDistinctItems,
+  topSellersByInvoices,
   topSellersByNetSales,
   type NamedValue,
   type SalesDetailStatsRow,
@@ -97,6 +98,7 @@ type TableTabId =
   | 'customersSpend'
   | 'branches'
   | 'sellers'
+  | 'sellersInvoices'
   | 'sellersItems'
   | 'categories'
 
@@ -150,7 +152,7 @@ const TABLE_TABS: {
   },
   {
     id: 'customersInvoices',
-    label: 'عملاء (طلبات)',
+    label: 'عملاء (فواتير)',
     accent: 'amber',
     valueFormat: 'count',
     columns: [
@@ -186,6 +188,16 @@ const TABLE_TABS: {
     columns: [
       { key: 'label', header: 'البائع' },
       { key: 'value', header: 'صافي المبيعات', align: 'end' },
+    ],
+  },
+  {
+    id: 'sellersInvoices',
+    label: 'البائعين (فواتير)',
+    accent: 'teal',
+    valueFormat: 'count',
+    columns: [
+      { key: 'label', header: 'البائع' },
+      { key: 'value', header: 'عدد الفواتير', align: 'end' },
     ],
   },
   {
@@ -527,6 +539,7 @@ export default function AdminInvoiceStatsPage() {
   const customersBySpend = useMemo(() => topCustomersBySpend(rows), [rows])
   const branches = useMemo(() => topBranchesByNetSales(rows), [rows])
   const sellers = useMemo(() => topSellersByNetSales(rows), [rows])
+  const sellersByInvoices = useMemo(() => topSellersByInvoices(rows), [rows])
   const sellersByItems = useMemo(() => topSellersByDistinctItems(rows), [rows])
   const categories = useMemo(() => topCategoriesByQty(rows), [rows])
 
@@ -549,6 +562,7 @@ export default function AdminInvoiceStatsPage() {
   const tableCustomersBySpend = useMemo(() => topCustomersBySpend(rows, TABLE_LIMIT), [rows])
   const tableBranches = useMemo(() => topBranchesByNetSales(rows, TABLE_LIMIT), [rows])
   const tableSellers = useMemo(() => topSellersByNetSales(rows, TABLE_LIMIT), [rows])
+  const tableSellersByInvoices = useMemo(() => topSellersByInvoices(rows, TABLE_LIMIT), [rows])
   const tableSellersByItems = useMemo(() => topSellersByDistinctItems(rows, TABLE_LIMIT), [rows])
   const tableCategories = useMemo(() => topCategoriesByQty(rows, TABLE_LIMIT), [rows])
 
@@ -561,6 +575,7 @@ export default function AdminInvoiceStatsPage() {
     customersSpend: tableCustomersBySpend,
     branches: tableBranches,
     sellers: tableSellers,
+    sellersInvoices: tableSellersByInvoices,
     sellersItems: tableSellersByItems,
     categories: tableCategories,
   }
@@ -797,7 +812,7 @@ export default function AdminInvoiceStatsPage() {
             />
           </StatsChartCard>
 
-          <StatsChartCard title="أكثر العملاء طلباً" empty={customersByInvoices.length === 0}>
+          <StatsChartCard title="عدد الفواتير لكل عميل" empty={customersByInvoices.length === 0}>
             <Bar
               data={barData(customersByInvoices, 'عدد الفواتير', CHART_AMBER, CHART_AMBER_BORDER)}
               options={countBarOptions}
@@ -822,6 +837,13 @@ export default function AdminInvoiceStatsPage() {
             <Bar
               data={barData(sellers, 'صافي المبيعات', CHART_TEAL, CHART_TEAL_BORDER)}
               options={currencyBarOptions}
+            />
+          </StatsChartCard>
+
+          <StatsChartCard title="عدد الفواتير لكل بائع" empty={sellersByInvoices.length === 0}>
+            <Bar
+              data={barData(sellersByInvoices, 'عدد الفواتير', CHART_TEAL, CHART_TEAL_BORDER)}
+              options={countBarOptions}
             />
           </StatsChartCard>
 
