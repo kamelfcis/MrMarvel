@@ -10,6 +10,44 @@ function toArEgDigits(value: string): string {
   return value.replace(/\d/g, (digit) => Number(digit).toLocaleString('ar-EG'))
 }
 
+function parseIsoDateParts(value: string): { y: number; m: number; d: number } | null {
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim())
+  if (!iso) return null
+  return { y: Number(iso[1]), m: Number(iso[2]), d: Number(iso[3]) }
+}
+
+/** Format YYYY-MM-DD as mm/dd/yyyy with Western digits (for date filter inputs). */
+export function formatIsoDateMDYInput(value: string | null | undefined): string {
+  const parts = value ? parseIsoDateParts(value) : null
+  if (!parts) return ''
+  return `${String(parts.m).padStart(2, '0')}/${String(parts.d).padStart(2, '0')}/${parts.y}`
+}
+
+/**
+ * Parse mm/dd/yyyy slash strings (month first, day second) to YYYY-MM-DD.
+ * Examples: "07/01/2026" → 2026-07-01, "7/1/26" → 2026-07-01.
+ */
+export function parseMDYInputToIso(value: string): string | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+
+  const match = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/)
+  if (!match) return null
+
+  const month = Number(match[1])
+  const day = Number(match[2])
+  let year = Number(match[3])
+  if (match[3].length === 2) {
+    year += year >= 70 ? 1900 : 2000
+  }
+
+  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900 || year > 2100) {
+    return null
+  }
+
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
 /** Format YYYY-MM-DD (or Date / ISO strings) as mm/dd/yyyy in ar-EG numerals (US date order). */
 export function formatDateMDY(value: string | Date | null | undefined): string {
   if (value == null || value === '') return '—'

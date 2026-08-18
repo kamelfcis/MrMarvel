@@ -17,6 +17,7 @@ import {
   Upload,
   X,
 } from 'lucide-react'
+import { DateMDYInput } from '../components/DateMDYInput'
 import { ExcelUploadZone } from '../components/invoices/ExcelUploadZone'
 import { InvoiceRow } from '../components/invoices/InvoiceRow'
 import { TablePagination, type PageSize } from '../components/TablePagination'
@@ -485,23 +486,19 @@ export default function AdminInvoicesPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="date-from">من تاريخ</Label>
-              <Input
+              <Label htmlFor="date-from">من تاريخ (mm/dd/yyyy)</Label>
+              <DateMDYInput
                 id="date-from"
-                type="date"
                 value={filters.dateFrom}
-                onChange={(e) => setFilters((p) => ({ ...p, dateFrom: e.target.value }))}
-                dir="ltr"
+                onChange={(iso) => setFilters((p) => ({ ...p, dateFrom: iso }))}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="date-to">إلى تاريخ</Label>
-              <Input
+              <Label htmlFor="date-to">إلى تاريخ (mm/dd/yyyy)</Label>
+              <DateMDYInput
                 id="date-to"
-                type="date"
                 value={filters.dateTo}
-                onChange={(e) => setFilters((p) => ({ ...p, dateTo: e.target.value }))}
-                dir="ltr"
+                onChange={(iso) => setFilters((p) => ({ ...p, dateTo: iso }))}
               />
             </div>
             <div className="space-y-1.5">
