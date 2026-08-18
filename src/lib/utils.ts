@@ -10,10 +10,22 @@ function toArEgDigits(value: string): string {
   return value.replace(/\d/g, (digit) => Number(digit).toLocaleString('ar-EG'))
 }
 
-function parseIsoDateParts(value: string): { y: number; m: number; d: number } | null {
+export function parseIsoDateParts(value: string): { y: number; m: number; d: number } | null {
   const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim())
   if (!iso) return null
   return { y: Number(iso[1]), m: Number(iso[2]), d: Number(iso[3]) }
+}
+
+/** Parse YYYY-MM-DD to a local Date (no UTC shift). */
+export function isoToLocalDate(value: string | null | undefined): Date | undefined {
+  const parts = value ? parseIsoDateParts(value) : null
+  if (!parts) return undefined
+  return new Date(parts.y, parts.m - 1, parts.d)
+}
+
+/** Format a local Date as YYYY-MM-DD (no UTC shift). */
+export function localDateToIso(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
 /** Format YYYY-MM-DD as mm/dd/yyyy with Western digits (for date filter inputs). */

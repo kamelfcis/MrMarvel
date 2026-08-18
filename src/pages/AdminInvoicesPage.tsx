@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   AlertCircle,
@@ -17,7 +17,7 @@ import {
   Upload,
   X,
 } from 'lucide-react'
-import { DateMDYInput } from '../components/DateMDYInput'
+import { DateMDYPicker } from '../components/DateMDYPicker'
 import { ExcelUploadZone } from '../components/invoices/ExcelUploadZone'
 import { InvoiceRow } from '../components/invoices/InvoiceRow'
 import { TablePagination, type PageSize } from '../components/TablePagination'
@@ -215,6 +215,8 @@ export default function AdminInvoicesPage() {
   const [searchParams] = useSearchParams()
   const [allInvoices, setAllInvoices] = useState<InvoiceSummary[]>([])
   const [loading, setLoading] = useState(true)
+  const [refetching, setRefetching] = useState(false)
+  const hasLoadedOnceRef = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<InvoiceFilters>(emptyFilters)
   const [debouncedInvoiceNumber, setDebouncedInvoiceNumber] = useState('')
@@ -265,8 +267,12 @@ export default function AdminInvoicesPage() {
   }, [])
 
   const fetchInvoices = useCallback(async () => {
-    setLoading(true)
     setError(null)
+    if (hasLoadedOnceRef.current) {
+      setRefetching(true)
+    } else {
+      setLoading(true)
+    }
 
     try {
       const all: InvoiceSummary[] = []
@@ -274,18 +280,11 @@ export default function AdminInvoicesPage() {
 
       while (true) {
         const to = from + PAGE_SIZE - 1
-        let query = supabase
+        const { data, error: queryError, count } = await supabase
           .from('invoice_summary')
           .select('*', { count: from === 0 ? 'exact' : undefined })
           .order('invoice_date', { ascending: false })
           .range(from, to)
-
-        if (filters.branch) query = query.eq('branch_name', filters.branch)
-        if (filters.seller) query = query.eq('seller_name', filters.seller)
-        if (filters.dateFrom) query = query.gte('invoice_date', filters.dateFrom)
-        if (filters.dateTo) query = query.lte('invoice_date', filters.dateTo)
-
-        const { data, error: queryError, count } = await query
 
         if (queryError) throw queryError
 
@@ -301,14 +300,16 @@ export default function AdminInvoicesPage() {
       }
 
       setAllInvoices(all)
+      hasLoadedOnceRef.current = true
     } catch (err) {
       console.error(err)
       setError('فشل تحميل بيانات الفواتير')
       setAllInvoices([])
     } finally {
       setLoading(false)
+      setRefetching(false)
     }
-  }, [filters.branch, filters.seller, filters.dateFrom, filters.dateTo])
+  }, [])
 
   const { uploading, clearing, progress, lastSummary, uploadFile, clearAllSales, resetProgress } =
     useSalesImport(() => {
@@ -337,10 +338,35 @@ export default function AdminInvoicesPage() {
     setCurrentPage(1)
   }, [filters, debouncedInvoiceNumber, pageSize, sortField, sortDirection])
 
-  const filteredInvoices = useMemo(
-    () => filterInvoicesByInvoiceNumber(allInvoices, debouncedInvoiceNumber),
-    [allInvoices, debouncedInvoiceNumber],
-  )
+  const filteredInvoices = useMemo(() => {
+    let result = allInvoices
+
+    if (filters.branch) {
+      result = result.filter((invoice) => invoice.branch_name === filters.branch)
+    }
+    if (filters.seller) {
+      result = result.filter((invoice) => invoice.seller_name === filters.seller)
+    }
+    if (filters.dateFrom) {
+      result = result.filter(
+        (invoice) => invoice.invoice_date != null && invoice.invoice_date >= filters.dateFrom,
+      )
+    }
+    if (filters.dateTo) {
+      result = result.filter(
+        (invoice) => invoice.invoice_date != null && invoice.invoice_date <= filters.dateTo,
+      )
+    }
+
+    return filterInvoicesByInvoiceNumber(result, debouncedInvoiceNumber)
+  }, [
+    allInvoices,
+    filters.branch,
+    filters.seller,
+    filters.dateFrom,
+    filters.dateTo,
+    debouncedInvoiceNumber,
+  ])
 
   const isSearching = debouncedInvoiceNumber.trim().length > 0
 
@@ -394,6 +420,8 @@ export default function AdminInvoicesPage() {
     setFilters((prev) => ({ ...prev, [key]: '' }))
   }
 
+  const showInitialSkeleton = loading && allInvoices.length === 0
+  const showStatsLoading = showInitialSkeleton
   const hasAnyData =
     !loading && !error && allInvoices.length === 0 && activeFilters.length === 0
 
@@ -418,8 +446,8 @@ export default function AdminInvoicesPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => void fetchInvoices()} disabled={loading}>
-            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin motion-reduce:animate-none')} />
+          <Button variant="outline" onClick={() => void fetchInvoices()} disabled={loading || refetching}>
+            <RefreshCw className={cn('h-4 w-4', (loading || refetching) && 'animate-spin motion-reduce:animate-none')} />
             تحديث
           </Button>
           <Button
@@ -438,7 +466,7 @@ export default function AdminInvoicesPage() {
         </div>
       </div>
 
-      <StatsCards loading={loading} {...stats} />
+      <StatsCards loading={showStatsLoading} {...stats} />
 
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gradient-to-b from-white to-slate-50/80 shadow-sm">
         <div className="border-b border-gray-100 px-5 py-4">
@@ -486,16 +514,16 @@ export default function AdminInvoicesPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="date-from">من تاريخ (mm/dd/yyyy)</Label>
-              <DateMDYInput
+              <Label htmlFor="date-from">من تاريخ</Label>
+              <DateMDYPicker
                 id="date-from"
                 value={filters.dateFrom}
                 onChange={(iso) => setFilters((p) => ({ ...p, dateFrom: iso }))}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="date-to">إلى تاريخ (mm/dd/yyyy)</Label>
-              <DateMDYInput
+              <Label htmlFor="date-to">إلى تاريخ</Label>
+              <DateMDYPicker
                 id="date-to"
                 value={filters.dateTo}
                 onChange={(iso) => setFilters((p) => ({ ...p, dateTo: iso }))}
@@ -546,7 +574,7 @@ export default function AdminInvoicesPage() {
           )}
         </div>
 
-        {loading ? (
+        {showInitialSkeleton ? (
           <TableSkeleton />
         ) : error ? (
           <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
@@ -579,7 +607,7 @@ export default function AdminInvoicesPage() {
             )}
           </div>
         ) : (
-          <>
+          <div className={cn(refetching && 'opacity-60 transition-opacity motion-reduce:transition-none')}>
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -676,7 +704,7 @@ export default function AdminInvoicesPage() {
                 setCurrentPage(1)
               }}
             />
-          </>
+          </div>
         )}
       </div>
 
