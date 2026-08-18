@@ -247,6 +247,64 @@ function toIsoDateParts(year: number, month: number, day: number): string | null
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
+/** Strip bracket and quoted literals from an Excel number format string. */
+function stripExcelFormatLiterals(format: string): string {
+  let result = ''
+  let i = 0
+  while (i < format.length) {
+    const ch = format[i]
+    if (ch === '[') {
+      const end = format.indexOf(']', i + 1)
+      i = end >= 0 ? end + 1 : format.length
+      continue
+    }
+    if (ch === '"' || ch === "'") {
+      const quote = ch
+      i++
+      while (i < format.length && format[i] !== quote) {
+        if (format[i] === '\\') i++
+        i++
+      }
+      i++
+      continue
+    }
+    if (ch === '\\' && i + 1 < format.length) {
+      i += 2
+      continue
+    }
+    result += ch
+    i++
+  }
+  return result
+}
+
+/** True when month token (m) appears before day token (d) — US-style m/d/yy. */
+export function isUsDateNumberFormat(z: string | number | undefined): boolean {
+  if (z == null || typeof z === 'number') return false
+  const stripped = stripExcelFormatLiterals(z).toLowerCase()
+  const mIdx = stripped.search(/m+/)
+  const dIdx = stripped.search(/d+/)
+  if (mIdx < 0 || dIdx < 0) return false
+  return mIdx < dIdx
+}
+
+/** True when day token (d) appears before month (m) — dd/mm display format. */
+function isDdMmDateNumberFormat(z: string | number | undefined): boolean {
+  if (z == null || typeof z === 'number') return false
+  const stripped = stripExcelFormatLiterals(z).toLowerCase()
+  const mIdx = stripped.search(/m+/)
+  const dIdx = stripped.search(/d+/)
+  if (mIdx < 0 || dIdx < 0) return false
+  return dIdx < mIdx
+}
+
+function serialToUsSlashString(serial: number): string | null {
+  const parsed = XLSX.SSF?.parse_date_code(serial)
+  if (!parsed || typeof parsed !== 'object') return null
+  const { y, m, d } = parsed as { y: number; m: number; d: number }
+  return `${m}/${d}/${String(y).slice(-2)}`
+}
+
 /**
  * Parse mm/dd/yyyy slash strings (month first, day second — never swap).
  * Examples: "08/09/2026" → 2026-08-09, "9/8/26" → 2026-09-08.
@@ -265,19 +323,23 @@ export function parseUsSlashDateString(trimmed: string): string | null {
   return toIsoDateParts(year, month, day)
 }
 
-function parseSaleDateFromSerial(serial: number): string | null {
-  if (!XLSX.SSF?.format) {
-    const parsed = XLSX.SSF?.parse_date_code(serial)
-    return parsed ? toIsoDateParts(parsed.y, parsed.m, parsed.d) : null
+function parseSaleDateFromSerial(serial: number, numberFormat?: string | number): string | null {
+  const useDdMmDisplayHack = isDdMmDateNumberFormat(numberFormat)
+
+  if (useDdMmDisplayHack && XLSX.SSF?.format) {
+    // Excel shows dd/mm/yyyy (e.g. 08/09/2026); business reads slash dates as mm/dd.
+    const display = XLSX.SSF.format('dd/mm/yyyy', serial)
+    const fromDisplay = parseUsSlashDateString(display)
+    if (fromDisplay) return fromDisplay
+
+    const month = Number(display.match(/^(\d{1,2})\//)?.[1])
+    if (month > 12) {
+      const parsed = XLSX.SSF.parse_date_code(serial)
+      return parsed ? toIsoDateParts(parsed.y, parsed.m, parsed.d) : null
+    }
   }
 
-  // Excel often shows dd/mm/yyyy (e.g. 08/09/2026) while the raw serial is US m/d.
-  // Format as dd/mm/yyyy, then parse that display text as mm/dd/yyyy.
-  const display = XLSX.SSF.format('dd/mm/yyyy', serial)
-  const fromDisplay = parseUsSlashDateString(display)
-  if (fromDisplay) return fromDisplay
-
-  const parsed = XLSX.SSF.parse_date_code(serial)
+  const parsed = XLSX.SSF?.parse_date_code(serial)
   return parsed ? toIsoDateParts(parsed.y, parsed.m, parsed.d) : null
 }
 
@@ -309,15 +371,24 @@ export function parseSaleDate(value: unknown): string | null {
   return null
 }
 
-/** Prefer formatted cell text; for serials use dd/mm/yyyy display then mm/dd parse. */
+/** Prefer formatted cell text; branch on Excel number format (US m/d vs dd/mm display). */
 export function saleDateValueFromCell(cell: CellObject | undefined): unknown {
   if (!cell) return null
 
   if (cell.t === 'n' && typeof cell.v === 'number' && Number.isFinite(cell.v)) {
-    if (XLSX.SSF?.format) {
+    const z = cell.z
+
+    if (isUsDateNumberFormat(z)) {
+      if (cell.w) return cell.w
+      return serialToUsSlashString(cell.v) ?? cell.v
+    }
+
+    if (isDdMmDateNumberFormat(z) && XLSX.SSF?.format) {
       return XLSX.SSF.format('dd/mm/yyyy', cell.v)
     }
-    return cell.v
+
+    if (cell.w) return cell.w
+    return serialToUsSlashString(cell.v) ?? cell.v
   }
 
   if (cell.w) return cell.w
