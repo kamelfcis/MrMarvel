@@ -69,6 +69,8 @@ const emptyFilters: InvoiceFilters = {
   invoiceNumber: '',
 }
 
+const PAGE_SIZE = 1000
+
 function formatCurrency(value: number | null | undefined) {
   if (value == null) return '—'
   return `${value.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`
@@ -266,21 +268,38 @@ export default function AdminInvoicesPage() {
     setError(null)
 
     try {
-      let query = supabase
-        .from('invoice_summary')
-        .select('*')
-        .order('invoice_date', { ascending: false })
+      const all: InvoiceSummary[] = []
+      let from = 0
 
-      if (filters.branch) query = query.eq('branch_name', filters.branch)
-      if (filters.seller) query = query.eq('seller_name', filters.seller)
-      if (filters.dateFrom) query = query.gte('invoice_date', filters.dateFrom)
-      if (filters.dateTo) query = query.lte('invoice_date', filters.dateTo)
+      while (true) {
+        const to = from + PAGE_SIZE - 1
+        let query = supabase
+          .from('invoice_summary')
+          .select('*', { count: from === 0 ? 'exact' : undefined })
+          .order('invoice_date', { ascending: false })
+          .range(from, to)
 
-      const { data, error: queryError } = await query
+        if (filters.branch) query = query.eq('branch_name', filters.branch)
+        if (filters.seller) query = query.eq('seller_name', filters.seller)
+        if (filters.dateFrom) query = query.gte('invoice_date', filters.dateFrom)
+        if (filters.dateTo) query = query.lte('invoice_date', filters.dateTo)
 
-      if (queryError) throw queryError
+        const { data, error: queryError, count } = await query
 
-      setAllInvoices((data as InvoiceSummary[]) ?? [])
+        if (queryError) throw queryError
+
+        const batch = (data as InvoiceSummary[]) ?? []
+        all.push(...batch)
+
+        if (from === 0 && (count ?? 0) > 0 && batch.length === 0) {
+          throw new Error('Pagination returned 0 rows despite non-zero count')
+        }
+
+        if (batch.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
+
+      setAllInvoices(all)
     } catch (err) {
       console.error(err)
       setError('فشل تحميل بيانات الفواتير')
